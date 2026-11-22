@@ -1,0 +1,46 @@
+{
+  "agent": [
+    "agent",
+    "budget.max_turns",
+    "budget.sessions_per_day",
+    "budget.tokens_per_session",
+    "harness",
+    "instructions",
+    "knowledge_base",
+    "model",
+    "sandbox.egress[]",
+    "sandbox.image",
+    "sandbox.web_search",
+    "tools.env[]",
+    "tools.mcp[]",
+    "tools.mcp[].as",
+    "tools.mcp[].server",
+    "trigger[].feed",
+    "trigger[].schedule",
+    "trigger[].webhook"
+  ],
+  "knowledge_base": [
+    "curator.model",
+    "curator.tokens_per_day",
+    "description",
+    "guidance",
+    "name"
+  ],
+  "tool": [
+    "cli.allow[]",
+    "cli.env.*",
+    "cli.hosts[].auth",
+    "cli.hosts[].auth.basic",
+    "cli.hosts[].host",
+    "connect.provider",
+    "connect.scopes[]",
+    "credential.client_id",
+    "credential.header",
+    "credential.kind",
+    "credential.scopes[]",
+    "credential.token_url",
+    "name",
+    "sample",
+    "url"
+  ]
+}
