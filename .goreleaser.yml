@@ -26,6 +26,9 @@ builds:
     ignore:
       - goos: darwin
         goarch: '386'
+      # Go marks windows/arm a broken port.
+      - goos: windows
+        goarch: arm
     binary: '{{ .ProjectName }}_v{{ .Version }}'
 archives:
   - formats: [zip]
