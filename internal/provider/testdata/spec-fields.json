@@ -11,7 +11,6 @@
     "sandbox.egress[]",
     "sandbox.image",
     "sandbox.web_search",
-    "tools.env[]",
     "tools.mcp[]",
     "tools.mcp[].as",
     "tools.mcp[].server",

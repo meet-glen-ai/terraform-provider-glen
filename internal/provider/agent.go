@@ -25,7 +25,6 @@ type triggerModel struct {
 }
 
 type toolsModel struct {
-	Env []string      `tfsdk:"env"`
 	MCP []mcpUseModel `tfsdk:"mcp"`
 }
 
@@ -64,7 +63,6 @@ func (m agentModel) spec() glen.AgentSpec {
 		})
 	}
 	if m.Tools != nil {
-		s.Tools = glen.Tools{Env: m.Tools.Env}
 		for _, u := range m.Tools.MCP {
 			s.Tools.MCP = append(s.Tools.MCP, glen.McpUse{Server: u.Server.ValueString(), As: u.As.ValueString()})
 		}
@@ -101,8 +99,8 @@ func canonicalModel(a glen.Agent) agentModel {
 			Webhook:  types.StringPointerValue(t.Webhook),
 		})
 	}
-	if len(s.Tools.Env)+len(s.Tools.MCP) > 0 {
-		m.Tools = &toolsModel{Env: nonEmpty(s.Tools.Env)}
+	if len(s.Tools.MCP) > 0 {
+		m.Tools = &toolsModel{}
 		for _, u := range s.Tools.MCP {
 			as := types.StringNull()
 			if u.As != "" {

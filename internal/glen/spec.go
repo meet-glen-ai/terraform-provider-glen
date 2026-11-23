@@ -22,7 +22,6 @@ type Trigger struct {
 }
 
 type Tools struct {
-	Env []string `json:"env"`
 	MCP []McpUse `json:"mcp"`
 }
 
@@ -63,7 +62,6 @@ type KnowledgeBase struct {
 
 func (s AgentSpec) Normalized() AgentSpec {
 	s.Trigger = orEmpty(s.Trigger)
-	s.Tools.Env = orEmpty(s.Tools.Env)
 	s.Tools.MCP = normalizedUses(s.Tools.MCP)
 	s.Sandbox.Egress = orEmpty(s.Sandbox.Egress)
 	return s

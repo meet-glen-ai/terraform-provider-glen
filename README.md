@@ -74,10 +74,6 @@ resource "glen_agent" "alert_triage" {
     schedule = "0 */6 * * *"
   }
 
-  tools {
-    env = ["GITHUB_TOKEN"]
-  }
-
   sandbox {
     egress     = ["api.github.com", "*.githubusercontent.com"]
     web_search = true
@@ -96,7 +92,7 @@ resource "glen_agent" "alert_triage" {
 | `model` | Required. |
 | `harness` | Optional. Unset, Glen picks it and the attribute holds Glen's choice: `claude-code` for a Claude model, and `codex` for an OpenAI model on a Glen that runs Codex. Set it only to pin one Glen would also pick. |
 | `trigger` | Repeated block. Each sets exactly one of `schedule` (five-field cron, UTC), `feed` (a feed Glen has, as the console's agent form lists them) and `webhook` (`<source>:<event>`, such as `github:pull_request`). Messages need no trigger: any member can message any agent with their own token. |
-| `tools` | Block. `env`: names of Glen's environment variables to pass into the sandbox; each must be one your Glen allows, as the console's agent form lists them. `mcp`: the tools the agent uses, a list of `{ server, as }`, where `server` is a tool's name, usually `glen_tool.<name>.name`, and `as` is `user`, `agent` or `service` (unset). See [Define a tool](#define-a-tool). |
+| `tools` | Block. `mcp`: the tools the agent uses, a list of `{ server, as }`, where `server` is a tool's name, usually `glen_tool.<name>.name`, and `as` is `user`, `agent` or `service` (unset). See [Define a tool](#define-a-tool). |
 | `sandbox` | Block. `image`: a container image for the sandbox. `egress`: the hosts the sandbox may connect to, besides Glen: a hostname such as `api.github.com`, or `*.` and a domain such as `*.githubusercontent.com`; unset, it reaches Glen only. `web_search`: the model provider's server-side web search, which runs at the provider, past the egress list; off when unset. |
 | `budget` | Block. `tokens_per_session`, `sessions_per_day` and `max_turns`. |
 | `knowledge_base` | The knowledge base the agent reads, usually `glen_knowledge_base.<name>.name`. |

@@ -35,10 +35,6 @@ resource "glen_agent" "triage" {
     webhook = "github:pull_request"
   }
 
-  tools {
-    env = ["GITHUB_TOKEN"]
-  }
-
   sandbox {
     image = "glen-sandbox:1"
   }
@@ -65,7 +61,6 @@ func triageSpec(model, instructions string) glen.AgentSpec {
 			{Feed: ptr("cisa-kev")},
 			{Webhook: ptr("github:pull_request")},
 		},
-		Tools:   glen.Tools{Env: []string{"GITHUB_TOKEN"}},
 		Sandbox: glen.Sandbox{Image: ptr("glen-sandbox:1")},
 		Budget:  glen.Budget{TokensPerSession: ptr(int64(100000)), SessionsPerDay: ptr(int64(200)), MaxTurns: ptr(int64(30))},
 	}
@@ -168,7 +163,7 @@ resource "glen_agent" "empty" {
   instructions = "Do the thing.\n"
   model        = "claude-opus-5-5"
   tools {
-    env = []
+    mcp = []
   }
 }
 `),
@@ -306,29 +301,6 @@ func TestAgentImportOfAnAgentMadeElsewhere(t *testing.T) {
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
-			}},
-		})
-	})
-}
-
-func TestAgentToolsEnvOutsideGlensAllowlistFailsAtPlan(t *testing.T) {
-	t.Parallel()
-	eachBackend(t, func(t *testing.T, b backend) {
-		b.test(t, resource.TestCase{
-			CheckDestroy: b.agentGone("env-outside"),
-			Steps: []resource.TestStep{{
-				Config: b.config(`
-resource "glen_agent" "env" {
-  name         = "env-outside"
-  instructions = "x"
-  model        = "claude-opus-5-5"
-  tools {
-    env = ["GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY"]
-  }
-}
-`),
-				PlanOnly:    true,
-				ExpectError: regexp.MustCompile(`tools.env\s+names\s+AWS_SECRET_ACCESS_KEY,\s+which\s+this\s+deployment\s+does\s+not\s+allow`),
 			}},
 		})
 	})

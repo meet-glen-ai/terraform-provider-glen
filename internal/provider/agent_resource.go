@@ -80,7 +80,6 @@ func (r *agentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			"tools": schema.SingleNestedBlock{
 				Description: "What the agent may use in its sandbox.",
 				Attributes: map[string]schema.Attribute{
-					"env": strs("Names of Glen's environment variables passed into the sandbox."),
 					"mcp": schema.ListNestedAttribute{
 						Description: "The tools the agent uses, by name: a glen_tool, usually glen_tool.<name>.name, or an MCP server this deployment has.",
 						Optional:    true,

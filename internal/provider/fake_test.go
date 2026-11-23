@@ -271,7 +271,6 @@ func readSpec(w http.ResponseWriter, r *http.Request) (glen.AgentSpec, bool) {
 	var lists struct {
 		Trigger json.RawMessage `json:"trigger"`
 		Tools   struct {
-			Env json.RawMessage `json:"env"`
 			MCP json.RawMessage `json:"mcp"`
 		} `json:"tools"`
 		Sandbox struct {
@@ -279,7 +278,7 @@ func readSpec(w http.ResponseWriter, r *http.Request) (glen.AgentSpec, bool) {
 		} `json:"sandbox"`
 	}
 	_ = json.Unmarshal(body, &lists)
-	for _, l := range []json.RawMessage{lists.Trigger, lists.Tools.Env, lists.Tools.MCP, lists.Sandbox.Egress} {
+	for _, l := range []json.RawMessage{lists.Trigger, lists.Tools.MCP, lists.Sandbox.Egress} {
 		if string(l) == "null" {
 			fail(w, http.StatusBadRequest, "invalid type: null, expected a sequence")
 			return spec, false
@@ -321,11 +320,6 @@ func glenAgentRules(s glen.AgentSpec) string {
 		}
 		if t.Webhook != nil && !strings.Contains(*t.Webhook, ":") {
 			return fmt.Sprintf("webhook %q must be <source>:<event>", *t.Webhook)
-		}
-	}
-	for _, v := range s.Tools.Env {
-		if !slices.Contains(toolsEnv, v) {
-			return fmt.Sprintf("tools.env names %s, which this deployment does not allow", v)
 		}
 	}
 	return ""

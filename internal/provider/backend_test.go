@@ -67,8 +67,6 @@ func (b backend) config(resources string) string {
 	return fmt.Sprintf("provider \"glen\" {\n  url     = %q\n  api_key = %q\n}\n\n%s", b.url, b.key, resources)
 }
 
-var toolsEnv = []string{"GITHUB_TOKEN"}
-
 // database makes a database of the test's own on the Postgres server at
 // server, owned by glen_owner, which like RDS's master user is neither
 // superuser nor BYPASSRLS, and drops it after the test. It answers the
@@ -202,7 +200,6 @@ func startGlen(t *testing.T, bin, server, adminKey string) string {
 			"GLEN_STORE=file://"+dir+"/store",
 			"GLEN_SANDBOX_BACKEND=process",
 			"GLEN_SANDBOX_WORKSPACE_ROOT="+dir+"/sessions",
-			"GLEN_TOOLS_ENV="+jsonStrings(toolsEnv),
 			"GLEN_DATABASE_URL="+database,
 		), extra...)
 	}
@@ -282,11 +279,6 @@ func serveGlen(t *testing.T, bin string, env []string, adminKey string) (string,
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-}
-
-func jsonStrings(xs []string) string {
-	b, _ := json.Marshal(xs)
-	return string(b)
 }
 
 func freePort(t *testing.T) int {
