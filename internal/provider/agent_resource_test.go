@@ -97,6 +97,7 @@ func (b backend) agentGone(name string) resource.TestCheckFunc {
 }
 
 func TestAgentCreateUpdateImportDelete(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			CheckDestroy: b.agentGone("alert-triage"),
@@ -131,6 +132,7 @@ func TestAgentCreateUpdateImportDelete(t *testing.T) {
 }
 
 func TestAgentLeftOutSettingsSendGlensDefaults(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{{
@@ -156,6 +158,7 @@ resource "glen_agent" "min" {
 }
 
 func TestAgentEmptyListsMatchLeftOutLists(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{{
@@ -178,6 +181,7 @@ resource "glen_agent" "empty" {
 }
 
 func TestAgentDriftShowsInPlan(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		config := b.config(triageConfig("claude-opus-5-5", "# Alert triage\n"))
 		b.test(t, resource.TestCase{
@@ -213,6 +217,7 @@ func TestAgentDriftShowsInPlan(t *testing.T) {
 }
 
 func TestAgentGlenRefusesAtPlan(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			CheckDestroy: b.agentGone("bad-cron"),
@@ -235,6 +240,7 @@ resource "glen_agent" "bad" {
 }
 
 func TestAgentTriggerSetsExactlyOneKind(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{{
@@ -257,6 +263,7 @@ resource "glen_agent" "two" {
 }
 
 func TestAgentCreateRefusesAnExistingAgent(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{{
@@ -273,6 +280,7 @@ func TestAgentCreateRefusesAnExistingAgent(t *testing.T) {
 }
 
 func TestAgentImportOfAnAgentMadeElsewhere(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{{
@@ -304,6 +312,7 @@ func TestAgentImportOfAnAgentMadeElsewhere(t *testing.T) {
 }
 
 func TestAgentToolsEnvOutsideGlensAllowlistFailsAtPlan(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			CheckDestroy: b.agentGone("env-outside"),

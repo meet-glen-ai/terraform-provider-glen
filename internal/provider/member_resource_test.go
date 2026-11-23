@@ -47,6 +47,7 @@ func (b backend) memberGone(email string) resource.TestCheckFunc {
 }
 
 func TestMemberImportRoleChangeDestroy(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.seedMember(t, "ana@tf.example", "admin")
 		b.seedMember(t, "ben@tf.example", "member")
@@ -83,6 +84,7 @@ func TestMemberImportRoleChangeDestroy(t *testing.T) {
 }
 
 func TestMemberTheLastAdminStays(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.seedMember(t, "ana@tf.example", "admin")
 		b.test(t, resource.TestCase{
@@ -117,6 +119,7 @@ removed {
 }
 
 func TestMemberNewIsInvited(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.seedMember(t, "ana@tf.example", "admin")
 		if b.real {
@@ -141,6 +144,7 @@ func TestMemberNewIsInvited(t *testing.T) {
 }
 
 func TestMemberConfigIsCheckedAtPlan(t *testing.T) {
+	t.Parallel()
 	b := newBackend(startFake(t, "key"), "key", false)
 	for _, c := range []struct{ config, want string }{
 		{memberConfig("x", "Ana@tf.example", "admin"), `Glen keeps emails lowercase`},

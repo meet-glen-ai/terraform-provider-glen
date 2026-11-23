@@ -33,10 +33,12 @@ type backend struct {
 
 func eachBackend(t *testing.T, f func(t *testing.T, b backend)) {
 	t.Run("fake", func(t *testing.T) {
+		t.Parallel()
 		key := randomKey(t)
 		f(t, newBackend(startFake(t, key), key, false))
 	})
 	t.Run("glen", func(t *testing.T) {
+		t.Parallel()
 		bin, server := os.Getenv("GLEN_BIN"), os.Getenv("DATABASE_URL")
 		if os.Getenv("TF_ACC") == "" || bin == "" || server == "" {
 			t.Skip("set TF_ACC=1, GLEN_BIN to a glen binary and DATABASE_URL to a Postgres server, such as postgres://postgres@127.0.0.1:5432/postgres, to run against glen serve")

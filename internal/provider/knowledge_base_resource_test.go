@@ -83,6 +83,7 @@ func (b backend) knowledgeBaseAndTriageGone(*terraform.State) error {
 }
 
 func TestKnowledgeBaseAndItsAgentCreateUpdateImportDestroy(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			CheckDestroy: b.knowledgeBaseAndTriageGone,
@@ -131,6 +132,7 @@ func TestKnowledgeBaseAndItsAgentCreateUpdateImportDestroy(t *testing.T) {
 }
 
 func TestKnowledgeBaseDriftShowsInPlan(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		config := b.config(secopsConfig("One page per host group.\n"))
 		b.test(t, resource.TestCase{
@@ -167,6 +169,7 @@ func TestKnowledgeBaseDriftShowsInPlan(t *testing.T) {
 }
 
 func TestKnowledgeBaseWithoutGuidanceImportsAsNull(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{{
@@ -211,6 +214,7 @@ resource "glen_knowledge_base" "secops" {
 }
 
 func TestKnowledgeBaseGlenRefusesAtPlan(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{{
@@ -232,6 +236,7 @@ resource "glen_knowledge_base" "broke" {
 }
 
 func TestKnowledgeBaseNeedsACuratorBlock(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{{
@@ -249,6 +254,7 @@ resource "glen_knowledge_base" "bare" {
 }
 
 func TestAgentNamingAMissingKnowledgeBasePlansThenFailsAtApply(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		config := b.config(`
 resource "glen_agent" "lost" {
@@ -269,6 +275,7 @@ resource "glen_agent" "lost" {
 }
 
 func TestAgentKnowledgeBaseMustBeAKnowledgeBaseNameAtPlan(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{{
@@ -288,6 +295,7 @@ resource "glen_agent" "odd" {
 }
 
 func TestKnowledgeBaseDeleteWhileAnAgentNamesItShowsGlensMessage(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			CheckDestroy: b.knowledgeBaseAndTriageGone,

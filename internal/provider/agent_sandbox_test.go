@@ -30,6 +30,7 @@ func webSpec(sandbox glen.Sandbox) glen.AgentSpec {
 }
 
 func TestAgentSandboxEgressAndWebSearch(t *testing.T) {
+	t.Parallel()
 	open := `
   sandbox {
     egress     = ["api.github.com", "*.githubusercontent.com"]
@@ -78,6 +79,7 @@ func TestAgentSandboxEgressAndWebSearch(t *testing.T) {
 }
 
 func TestAgentEgressGlenRefusesAtPlan(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{{
@@ -119,6 +121,7 @@ resource "glen_agent" "coder" {
 }
 
 func TestAgentHarnessLeftOutIsGlensChoice(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{
@@ -157,6 +160,7 @@ func TestAgentHarnessLeftOutIsGlensChoice(t *testing.T) {
 // The fake answers as a Glen whose harness follows the model, the rule
 // Glen takes on.
 func TestAgentOnAnOpenAIModelRunsOnCodexWhereGlenSaysSo(t *testing.T) {
+	t.Parallel()
 	key := randomKey(t)
 	b := newBackend(startFake(t, key), key, false)
 	b.test(t, resource.TestCase{

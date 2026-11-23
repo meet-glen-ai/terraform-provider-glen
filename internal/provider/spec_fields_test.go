@@ -41,6 +41,7 @@ var specFieldResources = map[string]func() resource.Resource{
 }
 
 func TestEverySpecFieldIsCarried(t *testing.T) {
+	t.Parallel()
 	file := "testdata/spec-fields.json"
 	if env := os.Getenv("GLEN_SPEC_FIELDS"); env != "" {
 		file = env

@@ -84,6 +84,7 @@ resource "glen_tool" "datadog" {
 }
 
 func TestToolCredentialIsWrittenToGlenAndNeverToState(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		const first, second = "dd-first-secret-0001", "dd-second-secret-0002"
 		datadog := glen.ToolSpec{Name: "datadog", URL: str("https://mcp.datadoghq.com/mcp"), Credential: &glen.ToolCredential{Kind: "api-key", Header: str("DD-API-KEY")}}
@@ -137,6 +138,7 @@ func datadogAt(url, value string, version int) string {
 }
 
 func TestToolCredentialMovesOnlyWithANewValue(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		const first, second = "dd-first-secret-0001", "dd-second-secret-0002"
 		const there = "https://mcp.datadoghq.eu/mcp"
@@ -162,6 +164,7 @@ func TestToolCredentialMovesOnlyWithANewValue(t *testing.T) {
 }
 
 func TestToolCredentialIsRefusedWhereGlenWouldRefuseIt(t *testing.T) {
+	t.Parallel()
 	b := newBackend(startFake(t, "k"), "k", false)
 	for _, c := range []struct{ config, msg string }{
 		{`credential_wo = "dd-secret-0001"`, "add a credential block naming its kind"},
@@ -189,6 +192,7 @@ resource "glen_model_key" "anthropic" {
 }
 
 func TestModelKeyIsWrittenToGlenRotatedByVersionAndRemovedOnDestroy(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		const first, second = "sk-ant-tf-first-0001", "sk-ant-tf-second-0002"
 		keySet := func(last4 string) resource.TestCheckFunc {
@@ -234,6 +238,7 @@ func TestModelKeyIsWrittenToGlenRotatedByVersionAndRemovedOnDestroy(t *testing.T
 }
 
 func TestModelKeyNamesAProviderGlenHas(t *testing.T) {
+	t.Parallel()
 	b := newBackend(startFake(t, "k"), "k", false)
 	b.test(t, resource.TestCase{Steps: []resource.TestStep{{
 		Config:      b.config("resource \"glen_model_key\" \"x\" {\n  model_provider = \"gemini\"\n  key_wo = \"k-0000-0000\"\n}\n"),

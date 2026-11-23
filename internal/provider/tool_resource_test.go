@@ -77,6 +77,7 @@ func jsonOf(s glen.ToolSpec) string {
 }
 
 func TestToolURLCreateUpdateImportDestroy(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			CheckDestroy: b.toolsGone("tickets"),
@@ -112,6 +113,7 @@ func TestToolURLCreateUpdateImportDestroy(t *testing.T) {
 }
 
 func TestToolSampleSwitchesToURL(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			CheckDestroy: b.toolsGone("meetings"),
@@ -147,6 +149,7 @@ resource "glen_tool" "meetings" {
 }
 
 func TestToolDriftShowsInPlan(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		config := b.config(ticketsConfig("https://tickets.example/mcp"))
 		b.test(t, resource.TestCase{
@@ -215,6 +218,7 @@ func githubSpec() glen.ToolSpec {
 }
 
 func TestToolCLIRoundTrip(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		needsSignIn(t, b)
 		bearerOnly := strings.Replace(githubTool, `{ host = "github.com", auth = "basic", user = "x-access-token" },`, `{ host = "github.com", auth = "bearer" },`, 1)
@@ -255,6 +259,7 @@ func TestToolCLIRoundTrip(t *testing.T) {
 }
 
 func TestToolSignInGlenSetsUpHasNoDiff(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		needsSignIn(t, b)
 		notion := func(url string) string {
@@ -311,6 +316,7 @@ func triageWithTools(uses ...glen.McpUse) glen.AgentSpec {
 }
 
 func TestAgentUsesAToolMadeInTheSameApply(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		config := b.config(ticketsConfig("https://tickets.example/mcp") + ticketsAgent)
 		b.test(t, resource.TestCase{
@@ -340,6 +346,7 @@ func TestAgentUsesAToolMadeInTheSameApply(t *testing.T) {
 }
 
 func TestAgentUsesAToolAsUser(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		needsSignIn(t, b)
 		config := b.config(githubTool + `
@@ -371,6 +378,7 @@ resource "glen_agent" "triage" {
 }
 
 func TestAgentUsingASignInToolAsServiceFailsAtPlan(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		needsSignIn(t, b)
 		b.test(t, resource.TestCase{
@@ -397,6 +405,7 @@ resource "glen_agent" "triage" {
 }
 
 func TestAgentNamingAMissingToolFailsAtApply(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		config := b.config(`
 resource "glen_agent" "lost" {
@@ -419,6 +428,7 @@ resource "glen_agent" "lost" {
 }
 
 func TestToolDeleteWhileAnAgentUsesItShowsGlensMessage(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			CheckDestroy: resource.ComposeTestCheckFunc(b.agentGone("alert-triage"), b.toolsGone("tickets")),
@@ -447,6 +457,7 @@ func TestToolDeleteWhileAnAgentUsesItShowsGlensMessage(t *testing.T) {
 }
 
 func TestToolBadSpecShowsGlensMessageAtApply(t *testing.T) {
+	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{
 			CheckDestroy: b.toolsGone("tickets"),
@@ -459,6 +470,7 @@ func TestToolBadSpecShowsGlensMessageAtApply(t *testing.T) {
 }
 
 func TestToolShapeIsCheckedAtPlan(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct{ body, says string }{
 		"url and sample": {`url = "https://a.example/mcp"
   sample = "meetings"`, "sets exactly one of url, sample and a cli block; this one sets 2"},
