@@ -18,6 +18,13 @@
     "trigger[].schedule",
     "trigger[].webhook"
   ],
+  "feed": [
+    "baseline",
+    "format",
+    "name",
+    "poll_secs",
+    "url"
+  ],
   "knowledge_base": [
     "curator.model",
     "curator.tokens_per_day",
