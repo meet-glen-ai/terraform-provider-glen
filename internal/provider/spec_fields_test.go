@@ -36,6 +36,7 @@ var specFieldsNotTerraforms = map[string]map[string]string{}
 
 var specFieldResources = map[string]func() resource.Resource{
 	"agent":          newAgentResource,
+	"feed":           newFeedResource,
 	"knowledge_base": newKnowledgeBaseResource,
 	"tool":           newToolResource,
 }

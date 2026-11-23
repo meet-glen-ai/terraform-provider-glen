@@ -3,7 +3,8 @@
 [Glen](https://meetglen.ai) runs teams of background agents for your org
 and turns every run into knowledge. This provider keeps your Glen org as
 code: each agent is a `glen_agent`, each knowledge base a
-`glen_knowledge_base`, each of the org's tools a `glen_tool`, each of its
+`glen_knowledge_base`, each feed its agents start on a `glen_feed`, each
+of the org's tools a `glen_tool`, each of its
 people a `glen_member`, the org's model keys `glen_model_key`, and its
 auto refill `glen_auto_refill`.
 `terraform plan` shows what would change, and `terraform apply` changes
@@ -92,7 +93,7 @@ resource "glen_agent" "alert_triage" {
 | `instructions` | Required. The text, not a path; use `file()`. |
 | `model` | Required. |
 | `harness` | Optional. Unset, Glen picks it and the attribute holds Glen's choice: `claude-code` for a Claude model, and `codex` for an OpenAI model on a Glen that runs Codex. Set it only to pin one Glen would also pick. |
-| `trigger` | Repeated block. Each sets exactly one of `schedule` (five-field cron, UTC), `feed` (a feed Glen has, as the console's agent form lists them) and `webhook` (`<source>:<event>`, such as `github:pull_request`). Messages need no trigger: any member can message any agent with their own token. |
+| `trigger` | Repeated block. Each sets exactly one of `schedule` (five-field cron, UTC), `feed` (a feed's name, usually `glen_feed.<name>.name`, or one the deployment polls) and `webhook` (`<source>:<event>`, such as `github:pull_request`). Messages need no trigger: any member can message any agent with their own token. |
 | `tools` | Block. `mcp`: the tools the agent uses, a list of `{ server, as }`, where `server` is a tool's name, usually `glen_tool.<name>.name`, and `as` is `user`, `agent` or `service` (unset). See [Define a tool](#define-a-tool). |
 | `sandbox` | Block. `image`: a container image for the sandbox. `egress`: the hosts the sandbox may connect to, besides Glen: a hostname such as `api.github.com`, or `*.` and a domain such as `*.githubusercontent.com`; unset, it reaches Glen only. `web_search`: the model provider's server-side web search, which runs at the provider, past the egress list; off when unset. |
 | `budget` | Block. `tokens_per_session`, `sessions_per_day` and `max_turns`. |
@@ -163,6 +164,50 @@ apply fails with Glen's message naming those agents. `terraform destroy`
 deletes the agents first, because they reference the knowledge base. An
 agent that names the knowledge base as a plain string, or one made outside
 this configuration, has no such reference, so change or delete it first.
+
+## Define a feed
+
+A feed is a document Glen polls for the org: an RSS feed, an OSV list or
+CISA's known-exploited list. Each new entry is a message to every agent
+whose trigger names the feed.
+
+```hcl
+resource "glen_feed" "zero_wire" {
+  name     = "zero-wire"
+  format   = "rss"
+  url      = "https://radar.cloudflare.com/zero-wire/feed"
+  baseline = false
+}
+
+resource "glen_agent" "intel" {
+  name = "intel"
+  trigger {
+    feed = glen_feed.zero_wire.name
+  }
+  # instructions, model, tools, as above
+}
+```
+
+| Argument | Notes |
+|---|---|
+| `name` | Required. Kebab-case. Changing it replaces the feed. It may not be a feed the deployment already polls. |
+| `format` | Required. `rss` (an entry per item, keyed by its guid), `osv` (a JSON array of OSV records) or `cisa-kev`. |
+| `url` | Required. https on a public address. Glen follows no redirect, so give the address the feed answers at. |
+| `poll_secs` | Optional. Seconds between polls, 60 to 86400. Defaults to 3600. |
+| `baseline` | Optional. Defaults to true: what the feed lists at its first poll is marked seen, so an old list does not start a session per entry. Set false to send every entry already listed. |
+| `version` | Computed. The feed's version in Glen. |
+
+Until an agent starts on a feed, Glen takes only its baseline and checks
+every minute for one, so an agent created after its feed starts on it
+within a minute. Glen
+refuses to delete a feed while an agent's trigger names it. Terraform
+destroys the agents first when their triggers reference
+`glen_feed.<name>.name`; an agent that names the feed as a plain string,
+or one made outside this configuration, still blocks the delete. Renaming
+a feed replaces it, and the old one is deleted before the agents move to
+the new name unless the feed sets `lifecycle { create_before_destroy =
+true }`. Import works as for agents:
+`terraform import glen_feed.zero_wire zero-wire`.
 
 ## Define a tool
 
