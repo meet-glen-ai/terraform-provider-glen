@@ -143,6 +143,19 @@ type ToolHost struct {
 	// BasicUser set: the token is the Basic auth password of this user.
 	// Unset: the token is a Bearer token.
 	BasicUser *string
+	// Requests set: the only requests Glen's proxy sends on this host
+	// with the token.
+	Requests []ToolRequest
+	// Others is what Glen does with the rest: "refuse" (unset) or
+	// "anonymous", sent with no token.
+	Others *string
+}
+
+// ToolRequest is a request a tool's host may be sent: a method and a
+// path pattern, where * is within one segment and a final ** the rest.
+type ToolRequest struct {
+	Method string `json:"method"`
+	Path   string `json:"path"`
 }
 
 func (h ToolHost) MarshalJSON() ([]byte, error) {
@@ -150,18 +163,30 @@ func (h ToolHost) MarshalJSON() ([]byte, error) {
 	if h.BasicUser != nil {
 		auth = map[string]string{"basic": *h.BasicUser}
 	}
-	return json.Marshal(map[string]any{"host": h.Host, "auth": auth})
+	out := map[string]any{"host": h.Host, "auth": auth}
+	if len(h.Requests) > 0 {
+		out["requests"] = h.Requests
+	}
+	if h.Others != nil && *h.Others != "refuse" {
+		out["others"] = *h.Others
+	}
+	return json.Marshal(out)
 }
 
 func (h *ToolHost) UnmarshalJSON(b []byte) error {
 	var raw struct {
-		Host string          `json:"host"`
-		Auth json.RawMessage `json:"auth"`
+		Host     string          `json:"host"`
+		Auth     json.RawMessage `json:"auth"`
+		Requests []ToolRequest   `json:"requests"`
+		Others   *string         `json:"others"`
 	}
 	if err := strict(b, &raw); err != nil {
 		return err
 	}
-	h.Host, h.BasicUser = raw.Host, nil
+	h.Host, h.BasicUser, h.Requests, h.Others = raw.Host, nil, raw.Requests, raw.Others
+	if h.Others != nil && *h.Others == "refuse" {
+		h.Others = nil
+	}
 	if len(raw.Auth) == 0 || string(raw.Auth) == `"bearer"` {
 		return nil
 	}
@@ -191,6 +216,11 @@ func (s ToolSpec) Normalized() ToolSpec {
 	if s.CLI != nil {
 		c := *s.CLI
 		c.Hosts = orEmpty(c.Hosts)
+		for i := range c.Hosts {
+			if len(c.Hosts[i].Requests) == 0 {
+				c.Hosts[i].Requests = nil
+			}
+		}
 		if len(c.Allow) == 0 {
 			c.Allow = nil
 		}

@@ -262,6 +262,35 @@ resource "glen_tool" "github" {
   }
 }
 
+# The same service, read-only and one repository: the proxy sends only
+# these requests with the token. On github.com it refuses the rest, a push
+# included; on api.github.com it sends the rest with no token, so public
+# reads still work.
+resource "glen_tool" "app_source" {
+  name = "app-source"
+
+  cli {
+    hosts = [
+      { host = "api.github.com", others = "anonymous", requests = [
+        { method = "GET", path = "/repos/acme/app" },
+        { method = "GET", path = "/repos/acme/app/contents/**" },
+        { method = "GET", path = "/repos/acme/app/commits/**" },
+      ] },
+      { host = "github.com", auth = "basic", user = "x-access-token", requests = [
+        { method = "GET", path = "/acme/app.git/info/refs" },
+        { method = "POST", path = "/acme/app.git/git-upload-pack" },
+      ] },
+    ]
+    allow = ["*.githubusercontent.com", "codeload.github.com"]
+    env   = { GH_TOKEN = "glen-proxy-injected" }
+  }
+
+  connect {
+    provider = "github-oauth"
+    scopes   = ["repo"]
+  }
+}
+
 resource "glen_agent" "alert_triage" {
   name = "alert-triage"
   # instructions, model, triggers, as above
@@ -282,7 +311,7 @@ resource "glen_agent" "alert_triage" {
 | `name` | Required. Kebab-case, not `glen`. Changing it replaces the tool. Tool names and agent names are separate. |
 | `url` | Where the MCP server answers, http or https. Set exactly one of `url`, `sample` and `cli`. |
 | `sample` | A sample MCP server Glen answers itself: `meetings`. |
-| `cli` | Block. A service the agents' CLIs call. Glen adds the connection's token to requests to its `hosts` outside the sandbox, so the token never enters it. `hosts` is a list of `{ host, auth, user }`: `host` is one lowercase hostname, and `auth` is how the token is written, `bearer` (unset) or `basic` with `user` as the user. `allow` lists hosts the sandbox reaches untouched, such as `*.githubusercontent.com`. `env` sets variables in the sandbox to a stand-in, for a client that will not run without a token. A `cli` tool needs `connect` with a `provider`. |
+| `cli` | Block. A service the agents' CLIs call. Glen adds the connection's token to requests to its `hosts` outside the sandbox, so the token never enters it. `hosts` is a list of `{ host, auth, user, requests, others }`: `host` is one lowercase hostname, and `auth` is how the token is written, `bearer` (unset) or `basic` with `user` as the user. `requests`, when set, are the only requests the proxy sends on the host with the token, each `{ method, path }`. With `others` unset or `refuse`, any other gets Glen's 403, never reaches the service and is on the session refused; with `others = "anonymous"` it goes with no token at all. In a `path`, `*` matches within one segment and a final `**` the rest of the path. Paths compare without case, and one with an empty, `.` or `..` segment, or a character other than a letter, a digit and `-._~+,=:@`, is named by no rule. `allow` lists hosts the sandbox reaches untouched, such as `*.githubusercontent.com`. `env` sets variables in the sandbox to a stand-in, for a client that will not run without a token. A `cli` tool needs `connect` with a `provider`. |
 | `connect` | Block. People and agents sign in to the tool, in the console. `provider` is an AgentCore Identity OAuth2 provider made outside Glen; unset, Glen makes its own when the tool is created. `scopes` are what a connection asks for; changing them means everyone connects again. A sample takes no `connect`. |
 | `credential` | Block. The tool's own credential, which Glen adds to every call an agent makes to it as the service, outside the sandbox. `kind` is `api-key`, a key sent as it is in `header`, or as `Authorization: Bearer` with `header` unset; or `service`, an OAuth2 client's secret that Glen trades at `token_url` for a token by the client credentials grant, as `client_id`, asking for `scopes`. Only a `url` tool takes one. Removing the block deletes the value from the org's vault. |
 | `credential_wo` | Write-only and sensitive: the credential's value, the key or the client's secret. Terraform keeps it in neither plan nor state, and Glen keeps it in the org's vault and never shows it. Written when the tool is created and whenever `credential_wo_version` changes. Leave it out to set the value on the tool's page in the console. |
