@@ -26,6 +26,8 @@ type fakeGlen struct {
 	// Each tool's credential value, and each provider's model key, as set.
 	credentials map[string]string
 	modelKeys   map[string]string
+	// The org's auto refill, Glen's defaults until a PUT.
+	autoRefill glen.AutoRefill
 }
 
 type fakeKnowledgeBase struct {
@@ -41,7 +43,7 @@ type fakeAgent struct {
 }
 
 func startFake(t *testing.T, adminKey string) string {
-	f := &fakeGlen{adminKey: adminKey, agents: map[string]*fakeAgent{}, knowledge_bases: map[string]*fakeKnowledgeBase{}, tools: map[string]*fakeTool{}, members: map[string]*fakeMember{}, credentials: map[string]string{}, modelKeys: map[string]string{}}
+	f := &fakeGlen{adminKey: adminKey, agents: map[string]*fakeAgent{}, knowledge_bases: map[string]*fakeKnowledgeBase{}, tools: map[string]*fakeTool{}, members: map[string]*fakeMember{}, credentials: map[string]string{}, modelKeys: map[string]string{}, autoRefill: defaultAutoRefill}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/validate/agent", f.validate)
 	mux.HandleFunc("GET /v1/agents/{name}", f.getAgent)
@@ -61,6 +63,7 @@ func startFake(t *testing.T, adminKey string) string {
 	mux.HandleFunc("PUT /v1/model-keys/{provider}", f.putModelKey)
 	mux.HandleFunc("DELETE /v1/model-keys/{provider}", f.deleteModelKey)
 	f.memberRoutes(mux)
+	f.billingRoutes(mux)
 	srv := httptest.NewServer(f.auth(mux))
 	fakes.Store(srv.URL, f)
 	t.Cleanup(srv.Close)

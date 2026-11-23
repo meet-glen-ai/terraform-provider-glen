@@ -76,7 +76,7 @@ func setting(v types.String, env string, at path.Path, diags *diag.Diagnostics) 
 }
 
 func (p *glenProvider) Resources(context.Context) []func() resource.Resource {
-	return []func() resource.Resource{newAgentResource, newKnowledgeBaseResource, newToolResource, newMemberResource, newModelKeyResource}
+	return []func() resource.Resource{newAgentResource, newKnowledgeBaseResource, newToolResource, newMemberResource, newModelKeyResource, newAutoRefillResource}
 }
 
 func (p *glenProvider) DataSources(context.Context) []func() datasource.DataSource {

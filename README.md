@@ -4,7 +4,8 @@
 and turns every run into knowledge. This provider keeps your Glen org as
 code: each agent is a `glen_agent`, each knowledge base a
 `glen_knowledge_base`, each of the org's tools a `glen_tool`, each of its
-people a `glen_member`, and the org's model keys `glen_model_key`.
+people a `glen_member`, the org's model keys `glen_model_key`, and its
+auto refill `glen_auto_refill`.
 `terraform plan` shows what would change, and `terraform apply` changes
 it through Glen's admin API.
 
@@ -314,6 +315,36 @@ resource "glen_model_key" "anthropic" {
 Destroying it removes the org's key of that provider; a refresh that finds
 none set shows it as one to create. `terraform import
 glen_model_key.anthropic anthropic` brings in a key set in the console.
+
+## Set auto refill
+
+When the org's credit falls below `below_cents`, Glen pays `amount_cents`
+with the card saved at the org's last top-up. An org has one auto refill,
+so declare at most one. The provider's token must be an admin's.
+
+```hcl
+resource "glen_auto_refill" "org" {
+  enabled      = true
+  below_cents  = 1000  # $10
+  amount_cents = 5000  # $50
+  cap_cents    = 30000 # $300 a month at most
+}
+```
+
+| Attribute | Notes |
+|---|---|
+| `enabled` | Required: whether Glen refills the org's credit. |
+| `below_cents` | Refill when the balance falls below this: 100 to 100000. Defaults to 500. |
+| `amount_cents` | What one refill pays before tax: 2000 to 100000. Defaults to 2000. |
+| `cap_cents` | The most refills pay before tax in a calendar month (UTC): at least one refill, up to 1000000. Defaults to 20000. |
+| `changed_by`, `changed_at` | Computed: who last changed it and when, after the last apply or refresh. |
+
+A change made on the console's Billing page shows in the next plan, and
+the apply after it sets the values back. Destroying the resource leaves
+the org's auto refill as it is, on or off: to stop refills, apply
+`enabled = false` first. `terraform import glen_auto_refill.org
+org` brings in the org's current settings; any id works. Top-ups and the
+card stay in the console, since a person pays them.
 
 ## What stays in the console
 
