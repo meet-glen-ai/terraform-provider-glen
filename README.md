@@ -200,8 +200,13 @@ resource "glen_agent" "intel" {
 Until an agent starts on a feed, Glen takes only its baseline and checks
 every minute for one, so an agent created after its feed starts on it
 within a minute. Glen
-refuses to delete a feed while an agent's trigger names it; Terraform
-destroys the agents first. Import works as for agents:
+refuses to delete a feed while an agent's trigger names it. Terraform
+destroys the agents first when their triggers reference
+`glen_feed.<name>.name`; an agent that names the feed as a plain string,
+or one made outside this configuration, still blocks the delete. Renaming
+a feed replaces it, and the old one is deleted before the agents move to
+the new name unless the feed sets `lifecycle { create_before_destroy =
+true }`. Import works as for agents:
 `terraform import glen_feed.zero_wire zero-wire`.
 
 ## Define a tool
