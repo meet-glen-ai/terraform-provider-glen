@@ -45,9 +45,16 @@ type toolCLIModel struct {
 }
 
 type toolHostModel struct {
-	Host types.String `tfsdk:"host"`
-	Auth types.String `tfsdk:"auth"`
-	User types.String `tfsdk:"user"`
+	Host     types.String       `tfsdk:"host"`
+	Auth     types.String       `tfsdk:"auth"`
+	User     types.String       `tfsdk:"user"`
+	Requests []toolRequestModel `tfsdk:"requests"`
+	Others   types.String       `tfsdk:"others"`
+}
+
+type toolRequestModel struct {
+	Method types.String `tfsdk:"method"`
+	Path   types.String `tfsdk:"path"`
 }
 
 type toolConnectModel struct {
@@ -69,6 +76,12 @@ func (m toolModel) spec() glen.ToolSpec {
 			host := glen.ToolHost{Host: h.Host.ValueString()}
 			if h.Auth.ValueString() == "basic" {
 				host.BasicUser = h.User.ValueStringPointer()
+			}
+			for _, r := range h.Requests {
+				host.Requests = append(host.Requests, glen.ToolRequest{Method: r.Method.ValueString(), Path: r.Path.ValueString()})
+			}
+			if o := h.Others.ValueString(); o != "" && o != "refuse" {
+				host.Others = &o
 			}
 			s.CLI.Hosts = append(s.CLI.Hosts, host)
 		}
@@ -101,9 +114,12 @@ func toolModelOf(t glen.Tool) toolModel {
 			m.CLI.Env = s.CLI.Env
 		}
 		for _, h := range s.CLI.Hosts {
-			host := toolHostModel{Host: types.StringValue(h.Host), Auth: types.StringNull(), User: types.StringNull()}
+			host := toolHostModel{Host: types.StringValue(h.Host), Auth: types.StringNull(), User: types.StringNull(), Others: types.StringPointerValue(h.Others)}
 			if h.BasicUser != nil {
 				host.Auth, host.User = types.StringValue("basic"), types.StringValue(*h.BasicUser)
+			}
+			for _, r := range h.Requests {
+				host.Requests = append(host.Requests, toolRequestModel{Method: types.StringValue(r.Method), Path: types.StringValue(r.Path)})
 			}
 			m.CLI.Hosts = append(m.CLI.Hosts, host)
 		}
@@ -223,6 +239,20 @@ func (r *toolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 									Optional:    true,
 								},
 								"user": schema.StringAttribute{Description: "The Basic user, with auth = \"basic\", such as x-access-token.", Optional: true},
+								"others": schema.StringAttribute{
+									Description: "With requests: what Glen does with a request they do not name. refuse (unset) answers 403; anonymous sends it with no token, as anyone may ask.",
+									Optional:    true,
+								},
+								"requests": schema.ListNestedAttribute{
+									Description: "When set, the only requests Glen's proxy sends on this host with the token; others says what becomes of the rest. Paths compare without case; * is within one segment and a final ** is the rest of the path.",
+									Optional:    true,
+									NestedObject: schema.NestedAttributeObject{
+										Attributes: map[string]schema.Attribute{
+											"method": schema.StringAttribute{Description: "GET, HEAD, POST, PUT, PATCH, DELETE or OPTIONS.", Required: true},
+											"path":   schema.StringAttribute{Description: "A path pattern, such as /repos/acme/app/**.", Required: true},
+										},
+									},
+								},
 							},
 						},
 					},

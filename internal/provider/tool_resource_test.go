@@ -224,6 +224,15 @@ func TestToolCLIRoundTrip(t *testing.T) {
 		bearerOnly := strings.Replace(githubTool, `{ host = "github.com", auth = "basic", user = "x-access-token" },`, `{ host = "github.com", auth = "bearer" },`, 1)
 		bearer := githubSpec()
 		bearer.CLI.Hosts[1].BasicUser = nil
+		readOnly := strings.Replace(githubTool, `{ host = "api.github.com" },`, `{ host = "api.github.com", others = "anonymous", requests = [{ method = "GET", path = "/repos/acme/app/**" }] },`, 1)
+		readOnly = strings.Replace(readOnly, `{ host = "github.com", auth = "basic", user = "x-access-token" },`, `{ host = "github.com", auth = "basic", user = "x-access-token", requests = [
+        { method = "GET", path = "/acme/app.git/info/refs" },
+        { method = "POST", path = "/acme/app.git/git-upload-pack" },
+      ] },`, 1)
+		ruled := githubSpec()
+		ruled.CLI.Hosts[0].Requests = []glen.ToolRequest{{Method: "GET", Path: "/repos/acme/app/**"}}
+		ruled.CLI.Hosts[0].Others = str("anonymous")
+		ruled.CLI.Hosts[1].Requests = []glen.ToolRequest{{Method: "GET", Path: "/acme/app.git/info/refs"}, {Method: "POST", Path: "/acme/app.git/git-upload-pack"}}
 		b.test(t, resource.TestCase{
 			CheckDestroy: b.toolsGone("github"),
 			Steps: []resource.TestStep{
@@ -252,6 +261,21 @@ func TestToolCLIRoundTrip(t *testing.T) {
 				{
 					Config:           b.config(bearerOnly),
 					ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}},
+				},
+				{
+					Config: b.config(readOnly),
+					Check:  b.glenHasTool(ruled, 3),
+				},
+				{
+					Config:           b.config(readOnly),
+					ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}},
+				},
+				{
+					ResourceName:                         "glen_tool.github",
+					ImportState:                          true,
+					ImportStateId:                        "github",
+					ImportStateVerify:                    true,
+					ImportStateVerifyIdentifierAttribute: "name",
 				},
 			},
 		})
