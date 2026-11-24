@@ -39,9 +39,10 @@ type toolCredentialModel struct {
 }
 
 type toolCLIModel struct {
-	Hosts []toolHostModel   `tfsdk:"hosts"`
-	Allow []string          `tfsdk:"allow"`
-	Env   map[string]string `tfsdk:"env"`
+	Hosts   []toolHostModel   `tfsdk:"hosts"`
+	Allow   []string          `tfsdk:"allow"`
+	Env     map[string]string `tfsdk:"env"`
+	AWSRole types.String      `tfsdk:"aws_role"`
 }
 
 type toolHostModel struct {
@@ -50,6 +51,8 @@ type toolHostModel struct {
 	User     types.String       `tfsdk:"user"`
 	Requests []toolRequestModel `tfsdk:"requests"`
 	Others   types.String       `tfsdk:"others"`
+	Service  types.String       `tfsdk:"aws_service"`
+	Region   types.String       `tfsdk:"aws_region"`
 }
 
 type toolRequestModel struct {
@@ -71,11 +74,14 @@ func (m toolModel) spec() glen.ToolSpec {
 		s.Credential = &glen.ToolCredential{Kind: c.Kind.ValueString(), Header: c.Header.ValueStringPointer(), TokenURL: c.TokenURL.ValueStringPointer(), ClientID: c.ClientID.ValueStringPointer(), Scopes: c.Scopes}
 	}
 	if m.CLI != nil {
-		s.CLI = &glen.ToolCLI{Allow: m.CLI.Allow, Env: m.CLI.Env}
+		s.CLI = &glen.ToolCLI{Allow: m.CLI.Allow, Env: m.CLI.Env, AWSRole: m.CLI.AWSRole.ValueStringPointer()}
 		for _, h := range m.CLI.Hosts {
 			host := glen.ToolHost{Host: h.Host.ValueString()}
-			if h.Auth.ValueString() == "basic" {
+			switch h.Auth.ValueString() {
+			case "basic":
 				host.BasicUser = h.User.ValueStringPointer()
+			case "aws":
+				host.AWS = &glen.ToolAWS{Service: h.Service.ValueString(), Region: h.Region.ValueString()}
 			}
 			for _, r := range h.Requests {
 				host.Requests = append(host.Requests, glen.ToolRequest{Method: r.Method.ValueString(), Path: r.Path.ValueString()})
@@ -109,14 +115,17 @@ func toolModelOf(t glen.Tool) toolModel {
 		m.Connect = &toolConnectModel{Provider: types.StringPointerValue(s.Connect.Provider), Scopes: nonEmpty(s.Connect.Scopes)}
 	}
 	if s.CLI != nil {
-		m.CLI = &toolCLIModel{Allow: nonEmpty(s.CLI.Allow)}
+		m.CLI = &toolCLIModel{Allow: nonEmpty(s.CLI.Allow), AWSRole: types.StringPointerValue(s.CLI.AWSRole)}
 		if len(s.CLI.Env) > 0 {
 			m.CLI.Env = s.CLI.Env
 		}
 		for _, h := range s.CLI.Hosts {
-			host := toolHostModel{Host: types.StringValue(h.Host), Auth: types.StringNull(), User: types.StringNull(), Others: types.StringPointerValue(h.Others)}
+			host := toolHostModel{Host: types.StringValue(h.Host), Auth: types.StringNull(), User: types.StringNull(), Others: types.StringPointerValue(h.Others), Service: types.StringNull(), Region: types.StringNull()}
 			if h.BasicUser != nil {
 				host.Auth, host.User = types.StringValue("basic"), types.StringValue(*h.BasicUser)
+			}
+			if h.AWS != nil {
+				host.Auth, host.Service, host.Region = types.StringValue("aws"), types.StringValue(h.AWS.Service), types.StringValue(h.AWS.Region)
 			}
 			for _, r := range h.Requests {
 				host.Requests = append(host.Requests, toolRequestModel{Method: types.StringValue(r.Method), Path: types.StringValue(r.Path)})
@@ -226,7 +235,7 @@ func (r *toolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 		},
 		Blocks: map[string]schema.Block{
 			"cli": schema.SingleNestedBlock{
-				Description: "A service the agents' CLIs call. Glen's egress proxy adds the connection's token on its hosts, so the token never enters the sandbox. Needs connect with a provider.",
+				Description: "A service the agents' CLIs call. Glen's egress proxy adds the connection's token on its hosts, or signs an AWS host's requests with aws_role, so no credential enters the sandbox. Needs connect with a provider unless every host is AWS's.",
 				Attributes: map[string]schema.Attribute{
 					"hosts": schema.ListNestedAttribute{
 						Description: "The hosts the proxy adds the token to, each one hostname.",
@@ -235,10 +244,12 @@ func (r *toolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 							Attributes: map[string]schema.Attribute{
 								"host": schema.StringAttribute{Description: "A lowercase hostname, such as api.github.com.", Required: true},
 								"auth": schema.StringAttribute{
-									Description: "How the token is written into Authorization: bearer, or basic with user, as git over HTTPS signs in. Unset is bearer.",
+									Description: "How the token is written into Authorization: bearer, or basic with user, as git over HTTPS signs in; or aws, a SigV4 signature for aws_service and aws_region made with a session of the cli block's aws_role. Unset is bearer.",
 									Optional:    true,
 								},
-								"user": schema.StringAttribute{Description: "The Basic user, with auth = \"basic\", such as x-access-token.", Optional: true},
+								"user":        schema.StringAttribute{Description: "The Basic user, with auth = \"basic\", such as x-access-token.", Optional: true},
+								"aws_service": schema.StringAttribute{Description: "With auth = \"aws\": the signing name, such as logs, or ecr for api.ecr.", Optional: true},
+								"aws_region":  schema.StringAttribute{Description: "With auth = \"aws\": the region, such as us-west-2, which the host's name holds.", Optional: true},
 								"others": schema.StringAttribute{
 									Description: "With requests: what Glen does with a request they do not name. refuse (unset) answers 403; anonymous sends it with no token, as anyone may ask.",
 									Optional:    true,
@@ -264,6 +275,10 @@ func (r *toolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					"env": schema.MapAttribute{
 						Description: "Variables set in the sandbox to a stand-in, for a client that will not run without a token, such as GH_TOKEN.",
 						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"aws_role": schema.StringAttribute{
+						Description: "The IAM role whose session signs the requests of hosts with auth = \"aws\", an ARN whose name begins glen-tool-. Glen assumes it for each session from the org's own session, with the org's id as the external id.",
 						Optional:    true,
 					},
 				},
@@ -356,16 +371,33 @@ func (r *toolResource) ValidateConfig(ctx context.Context, req resource.Validate
 	if cli.IsNull() {
 		return
 	}
-	if connect.IsNull() {
-		resp.Diagnostics.AddAttributeError(path.Root("connect"), "Missing connect block",
-			"A cli tool needs connect with a provider: the sign-in whose token Glen adds for the CLI.")
-	} else if p, ok := connect.Attributes()["provider"]; ok && p.IsNull() {
-		resp.Diagnostics.AddAttributeError(path.Root("connect").AtName("provider"), "Missing provider",
-			"A CLI's service has no sign-in Glen can set up itself: name an Identity OAuth2 provider in connect.provider.")
-	}
 	hosts, ok := cli.Attributes()["hosts"].(types.List)
 	if !ok || hosts.IsUnknown() {
 		return
+	}
+	aws, others, unknown := hostsSigned(hosts)
+	switch {
+	case unknown:
+		// Which hosts are AWS's is known only at apply; Glen checks it then.
+	case aws > 0 && others == 0 && !connect.IsNull():
+		resp.Diagnostics.AddAttributeError(path.Root("connect"), "Invalid tool",
+			"Every host of this cli tool is signed with its AWS role, so nobody signs in; leave connect out.")
+	case aws > 0 && others == 0:
+	case connect.IsNull():
+		resp.Diagnostics.AddAttributeError(path.Root("connect"), "Missing connect block",
+			"A cli tool needs connect with a provider: the sign-in whose token Glen adds for the CLI.")
+	default:
+		if p, ok := connect.Attributes()["provider"]; ok && p.IsNull() {
+			resp.Diagnostics.AddAttributeError(path.Root("connect").AtName("provider"), "Missing provider",
+				"A CLI's service has no sign-in Glen can set up itself: name an Identity OAuth2 provider in connect.provider.")
+		}
+	}
+	if role, ok := cli.Attributes()["aws_role"].(types.String); ok && !unknown && !role.IsUnknown() && (aws > 0) == role.IsNull() {
+		says := "Hosts with auth = \"aws\" are signed with aws_role: set it to the IAM role's ARN."
+		if aws == 0 {
+			says = "aws_role signs the hosts with auth = \"aws\", and this cli block has none."
+		}
+		resp.Diagnostics.AddAttributeError(path.Root("cli").AtName("aws_role"), "Invalid tool", says)
 	}
 	if len(hosts.Elements()) == 0 {
 		resp.Diagnostics.AddAttributeError(path.Root("cli").AtName("hosts"), "Missing hosts",
@@ -411,6 +443,28 @@ func validateCredential(c types.Object, diags *diag.Diagnostics) {
 	}
 }
 
+// hostsSigned counts the hosts with auth = "aws" and the others, and
+// says whether any host's auth is not known yet.
+func hostsSigned(hosts types.List) (aws, others int, unknown bool) {
+	for _, e := range hosts.Elements() {
+		obj, ok := e.(types.Object)
+		if !ok || obj.IsUnknown() {
+			unknown = true
+			continue
+		}
+		auth, _ := obj.Attributes()["auth"].(types.String)
+		switch {
+		case auth.IsUnknown():
+			unknown = true
+		case auth.ValueString() == "aws":
+			aws++
+		default:
+			others++
+		}
+	}
+	return aws, others, unknown
+}
+
 func (r *toolResource) validateHost(e attr.Value, at path.Path, diags *diag.Diagnostics) {
 	obj, ok := e.(types.Object)
 	if !ok || obj.IsUnknown() {
@@ -420,13 +474,18 @@ func (r *toolResource) validateHost(e attr.Value, at path.Path, diags *diag.Diag
 	host, _ := a["host"].(types.String)
 	auth, _ := a["auth"].(types.String)
 	user, _ := a["user"].(types.String)
+	service, _ := a["aws_service"].(types.String)
+	region, _ := a["aws_region"].(types.String)
 	if !host.IsUnknown() && !host.IsNull() {
 		if why := hostProblem(host.ValueString()); why != "" {
 			diags.AddAttributeError(at.AtName("host"), "Invalid host", fmt.Sprintf("cli.hosts %q %s.", host.ValueString(), why))
 		}
 	}
-	if auth.IsUnknown() || user.IsUnknown() {
+	if auth.IsUnknown() || user.IsUnknown() || service.IsUnknown() || region.IsUnknown() {
 		return
+	}
+	if auth.ValueString() != "aws" && !(service.IsNull() && region.IsNull()) {
+		diags.AddAttributeError(at.AtName("aws_service"), "Invalid host", "aws_service and aws_region go with auth = \"aws\".")
 	}
 	switch auth.ValueString() {
 	case "", "bearer":
@@ -437,8 +496,15 @@ func (r *toolResource) validateHost(e attr.Value, at path.Path, diags *diag.Diag
 		if u := user.ValueString(); u == "" || strings.Contains(u, ":") {
 			diags.AddAttributeError(at.AtName("user"), "Invalid host", "auth = \"basic\" needs a user that is not empty and has no colon, such as x-access-token.")
 		}
+	case "aws":
+		if service.ValueString() == "" || region.ValueString() == "" {
+			diags.AddAttributeError(at.AtName("aws_service"), "Invalid host", "auth = \"aws\" needs aws_service and aws_region, such as logs and us-west-2.")
+		}
+		if !user.IsNull() {
+			diags.AddAttributeError(at.AtName("user"), "Invalid host", "user goes with auth = \"basic\"; an AWS host is signed with the tool's role.")
+		}
 	default:
-		diags.AddAttributeError(at.AtName("auth"), "Invalid host", fmt.Sprintf("auth %q is not one Glen has; it has bearer and basic.", auth.ValueString()))
+		diags.AddAttributeError(at.AtName("auth"), "Invalid host", fmt.Sprintf("auth %q is not one Glen has; it has bearer, basic and aws.", auth.ValueString()))
 	}
 }
 

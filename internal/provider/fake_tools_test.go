@@ -281,7 +281,14 @@ func toolProblems(s glen.ToolSpec) []string {
 				out = append(out, fmt.Sprintf("cli.env %q is a variable Glen or the sandbox sets; a stand-in is for a client's own token variable, such as GH_TOKEN", name))
 			}
 		}
+		onlyAWS := len(c.Hosts) > 0
+		for _, h := range c.Hosts {
+			onlyAWS = onlyAWS && h.AWS != nil
+		}
 		switch {
+		case onlyAWS && s.Connect != nil:
+			out = append(out, "every host of this CLI's service is signed with its AWS role, so nobody signs in; leave connect out")
+		case onlyAWS:
 		case s.Connect == nil:
 			out = append(out, "connect is missing: the sign-in whose token Glen adds for the CLI")
 		case s.Connect.Provider == nil:

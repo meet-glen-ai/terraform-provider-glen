@@ -282,6 +282,46 @@ func TestToolCLIRoundTrip(t *testing.T) {
 	})
 }
 
+const awsTool = `
+resource "glen_tool" "aws" {
+  name = "glen-aws"
+
+  cli {
+    hosts = [
+      { host = "logs.us-west-2.amazonaws.com", auth = "aws", aws_service = "logs", aws_region = "us-west-2" },
+      { host = "api.ecr.us-west-2.amazonaws.com", auth = "aws", aws_service = "ecr", aws_region = "us-west-2" },
+    ]
+    aws_role = "arn:aws:iam::123456789012:role/glen-tool-read"
+    env      = { AWS_ACCESS_KEY_ID = "glen-stand-in", AWS_SECRET_ACCESS_KEY = "glen-stand-in", AWS_REGION = "us-west-2" }
+  }
+}
+`
+
+func TestToolAWSRoundTrip(t *testing.T) {
+	t.Parallel()
+	eachBackend(t, func(t *testing.T, b backend) {
+		aws := glen.ToolSpec{
+			Name: "glen-aws",
+			CLI: &glen.ToolCLI{
+				Hosts: []glen.ToolHost{
+					{Host: "logs.us-west-2.amazonaws.com", AWS: &glen.ToolAWS{Service: "logs", Region: "us-west-2"}},
+					{Host: "api.ecr.us-west-2.amazonaws.com", AWS: &glen.ToolAWS{Service: "ecr", Region: "us-west-2"}},
+				},
+				Env:     map[string]string{"AWS_ACCESS_KEY_ID": "glen-stand-in", "AWS_SECRET_ACCESS_KEY": "glen-stand-in", "AWS_REGION": "us-west-2"},
+				AWSRole: str("arn:aws:iam::123456789012:role/glen-tool-read"),
+			},
+		}
+		b.test(t, resource.TestCase{
+			CheckDestroy: b.toolsGone("glen-aws"),
+			Steps: []resource.TestStep{
+				{Config: b.config(awsTool), Check: b.glenHasTool(aws, 1)},
+				{Config: b.config(awsTool), ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}}},
+				{ResourceName: "glen_tool.aws", ImportState: true, ImportStateId: "glen-aws", ImportStateVerify: true, ImportStateVerifyIdentifierAttribute: "name"},
+			},
+		})
+	})
+}
+
 func TestToolSignInGlenSetsUpHasNoDiff(t *testing.T) {
 	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
@@ -520,6 +560,23 @@ func TestToolShapeIsCheckedAtPlan(t *testing.T) {
     hosts = [{ host = "github.com", auth = "token" }]
   }
   connect { provider = "p" }`, `auth "token" is not one Glen has`},
+		"aws without service": {`cli {
+    hosts    = [{ host = "logs.us-west-2.amazonaws.com", auth = "aws" }]
+    aws_role = "arn:aws:iam::123456789012:role/glen-tool-read"
+  }`, `auth = "aws" needs aws_service and aws_region`},
+		"aws without role": {`cli {
+    hosts = [{ host = "logs.us-west-2.amazonaws.com", auth = "aws", aws_service = "logs", aws_region = "us-west-2" }]
+  }`, `signed with aws_role`},
+		"aws with connect": {`cli {
+    hosts    = [{ host = "logs.us-west-2.amazonaws.com", auth = "aws", aws_service = "logs", aws_region = "us-west-2" }]
+    aws_role = "arn:aws:iam::123456789012:role/glen-tool-read"
+  }
+  connect { provider = "p" }`, `nobody signs in`},
+		"role without aws": {`cli {
+    hosts    = [{ host = "api.github.com" }]
+    aws_role = "arn:aws:iam::123456789012:role/glen-tool-read"
+  }
+  connect { provider = "p" }`, `this cli block has none`},
 		"no hosts": {`cli {}
   connect { provider = "p" }`, "cli.hosts is empty"},
 	}
@@ -540,4 +597,25 @@ func TestToolShapeIsCheckedAtPlan(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestToolHostsAuthKnownOnlyAtApplyIsLeftToGlen(t *testing.T) {
+	t.Parallel()
+	b := newBackend(startFake(t, "key"), "key", false)
+	b.test(t, resource.TestCase{
+		Steps: []resource.TestStep{{
+			Config: b.config(`resource "terraform_data" "later" {}
+
+resource "glen_tool" "read" {
+  name = "read"
+  cli {
+    hosts    = [{ host = "logs.us-west-2.amazonaws.com", auth = terraform_data.later.id == "" ? "aws" : "aws", aws_service = "logs", aws_region = "us-west-2" }]
+    aws_role = "arn:aws:iam::123456789012:role/glen-tool-read"
+  }
+}
+`),
+			PlanOnly:           true,
+			ExpectNonEmptyPlan: true,
+		}},
+	})
 }

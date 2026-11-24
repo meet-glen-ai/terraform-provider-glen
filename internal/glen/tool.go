@@ -135,6 +135,8 @@ type ToolCLI struct {
 	Hosts []ToolHost        `json:"hosts"`
 	Allow []string          `json:"allow,omitempty"`
 	Env   map[string]string `json:"env,omitempty"`
+	// AWSRole is the IAM role whose session signs the AWS hosts' requests.
+	AWSRole *string `json:"aws_role,omitempty"`
 }
 
 // ToolHost is a host Glen's egress proxy adds the token to, and how.
@@ -149,6 +151,15 @@ type ToolHost struct {
 	// Others is what Glen does with the rest: "refuse" (unset) or
 	// "anonymous", sent with no token.
 	Others *string
+	// AWS set: Glen signs the host's requests with SigV4 for this service
+	// and region, with a session of the tool's AWS role.
+	AWS *ToolAWS
+}
+
+// ToolAWS is what an AWS host's requests are signed for.
+type ToolAWS struct {
+	Service string `json:"service"`
+	Region  string `json:"region"`
 }
 
 // ToolRequest is a request a tool's host may be sent: a method and a
@@ -162,6 +173,9 @@ func (h ToolHost) MarshalJSON() ([]byte, error) {
 	var auth any = "bearer"
 	if h.BasicUser != nil {
 		auth = map[string]string{"basic": *h.BasicUser}
+	}
+	if h.AWS != nil {
+		auth = map[string]ToolAWS{"aws": *h.AWS}
 	}
 	out := map[string]any{"host": h.Host, "auth": auth}
 	if len(h.Requests) > 0 {
@@ -183,20 +197,21 @@ func (h *ToolHost) UnmarshalJSON(b []byte) error {
 	if err := strict(b, &raw); err != nil {
 		return err
 	}
-	h.Host, h.BasicUser, h.Requests, h.Others = raw.Host, nil, raw.Requests, raw.Others
+	h.Host, h.BasicUser, h.Requests, h.Others, h.AWS = raw.Host, nil, raw.Requests, raw.Others, nil
 	if h.Others != nil && *h.Others == "refuse" {
 		h.Others = nil
 	}
 	if len(raw.Auth) == 0 || string(raw.Auth) == `"bearer"` {
 		return nil
 	}
-	var basic struct {
-		Basic *string `json:"basic"`
+	var signed struct {
+		Basic *string  `json:"basic"`
+		AWS   *ToolAWS `json:"aws"`
 	}
-	if err := strict(raw.Auth, &basic); err != nil || basic.Basic == nil {
-		return fmt.Errorf(`auth %s is neither "bearer" nor {"basic": <user>}`, raw.Auth)
+	if err := strict(raw.Auth, &signed); err != nil || (signed.Basic == nil) == (signed.AWS == nil) {
+		return fmt.Errorf(`auth %s is not "bearer", {"basic": <user>} or {"aws": {"service": ..., "region": ...}}`, raw.Auth)
 	}
-	h.BasicUser = basic.Basic
+	h.BasicUser, h.AWS = signed.Basic, signed.AWS
 	return nil
 }
 

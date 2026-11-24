@@ -25,8 +25,10 @@ var specFieldRenames = map[string]map[string]string{
 		"agent": "name",
 	},
 	"tool": {
-		"cli.hosts[].auth.basic": "cli.hosts.user",
-		"cli.env.*":              "cli.env",
+		"cli.hosts[].auth.basic":       "cli.hosts.user",
+		"cli.hosts[].auth.aws.service": "cli.hosts.aws_service",
+		"cli.hosts[].auth.aws.region":  "cli.hosts.aws_region",
+		"cli.env.*":                    "cli.env",
 	},
 }
 

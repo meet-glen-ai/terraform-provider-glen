@@ -34,8 +34,11 @@
   ],
   "tool": [
     "cli.allow[]",
+    "cli.aws_role",
     "cli.env.*",
     "cli.hosts[].auth",
+    "cli.hosts[].auth.aws.region",
+    "cli.hosts[].auth.aws.service",
     "cli.hosts[].auth.basic",
     "cli.hosts[].host",
     "cli.hosts[].others",
