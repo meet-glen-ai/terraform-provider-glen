@@ -85,6 +85,13 @@ resource "glen_agent" "alert_triage" {
   budget {
     sessions_per_day = 200
   }
+
+  notify {
+    email {
+      to = ["ann@example.com"]
+      on = ["failed", "needs_you"]
+    }
+  }
 }
 ```
 
@@ -98,6 +105,7 @@ resource "glen_agent" "alert_triage" {
 | `tools` | Block. `mcp`: the tools the agent uses, a list of `{ server, as }`, where `server` is a tool's name, usually `glen_tool.<name>.name`, and `as` is `user`, `agent` or `service` (unset). See [Define a tool](#define-a-tool). |
 | `sandbox` | Block. `image`: a container image for the sandbox. `egress`: the hosts the sandbox may connect to, besides Glen: a hostname such as `api.github.com`, or `*.` and a domain such as `*.githubusercontent.com`; unset, it reaches Glen only. `web_search`: the model provider's server-side web search, which runs at the provider, past the egress list; off when unset. |
 | `budget` | Block. `tokens_per_session`, `sessions_per_day` and `max_turns`. |
+| `notify` | Block. `email`, a block: `to`, required, the org members Glen emails, by their sign-in address, usually `glen_member.<name>.email`; and `on`, what it emails them on, each at most once: `finished` (a session settled done, with no ask open), `failed` (a session failed, not stopped by a budget) and `needs_you` (it asked, Glen held one of its calls, or a budget stopped it). Unset, Glen emails no one. Glen refuses an address that is not a member's. |
 | `knowledge_base` | The knowledge base the agent reads, usually `glen_knowledge_base.<name>.name`. |
 | `version` | Computed. The agent's version in Glen. |
 

@@ -1,6 +1,9 @@
 package glen
 
-import "reflect"
+import (
+	"reflect"
+	"strings"
+)
 
 type AgentSpec struct {
 	Agent        string `json:"agent"`
@@ -17,7 +20,24 @@ type AgentSpec struct {
 	// agent, allowing its held calls among those messages, besides its
 	// admins. Left out when none, as Glen writes it.
 	AllowedMessageSenders []string `json:"allowed_message_senders,omitempty"`
+	// Notify is who Glen emails when the agent's session finishes, fails
+	// or needs someone. Left out when unset, as Glen writes it.
+	Notify *Notify `json:"notify,omitempty"`
 }
+
+type Notify struct {
+	Email *EmailNotify `json:"email,omitempty"`
+}
+
+// EmailNotify emails the org's members To, by their sign-in address, on
+// each of the events On: finished, failed and needs_you.
+type EmailNotify struct {
+	To []string `json:"to"`
+	On []string `json:"on"`
+}
+
+// NotifyOn is every event an agent's notify may name.
+var NotifyOn = []string{"finished", "failed", "needs_you"}
 
 type Trigger struct {
 	Schedule *string `json:"schedule,omitempty"`
@@ -71,11 +91,36 @@ func (s AgentSpec) Normalized() AgentSpec {
 	if len(s.AllowedMessageSenders) == 0 {
 		s.AllowedMessageSenders = nil
 	}
+	// A notify with no email says nothing, and Glen leaves it out.
+	if s.Notify != nil && s.Notify.Email == nil {
+		s.Notify = nil
+	}
+	if s.Notify != nil {
+		e := *s.Notify.Email
+		e.To, e.On = orEmpty(e.To), orEmpty(e.On)
+		s.Notify = &Notify{Email: &e}
+	}
 	return s
 }
 
+// Equal is whether s and o say the same agent. Glen matches
+// notify.email.to to the org's members whatever the case, and keeps
+// each as the member's own address.
 func (s AgentSpec) Equal(o AgentSpec) bool {
-	return reflect.DeepEqual(s.Normalized(), o.Normalized())
+	return reflect.DeepEqual(s.Normalized().foldedAddresses(), o.Normalized().foldedAddresses())
+}
+
+func (s AgentSpec) foldedAddresses() AgentSpec {
+	if s.Notify == nil {
+		return s
+	}
+	e := *s.Notify.Email
+	e.To = make([]string, len(s.Notify.Email.To))
+	for i, to := range s.Notify.Email.To {
+		e.To[i] = strings.ToLower(to)
+	}
+	s.Notify = &Notify{Email: &e}
+	return s
 }
 
 func orEmpty[T any](xs []T) []T {

@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -10,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/meet-glen-ai/terraform-provider-glen/internal/glen"
@@ -118,6 +121,27 @@ func (r *agentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 					"max_turns":          count("Turn limit per session."),
 				},
 			},
+			"notify": schema.SingleNestedBlock{
+				Description: "Who Glen tells when one of the agent's sessions finishes, fails or needs someone. Unset, Glen emails no one of them.",
+				Blocks: map[string]schema.Block{
+					"email": schema.SingleNestedBlock{
+						Description: "Email to the org's members.",
+						Attributes: map[string]schema.Attribute{
+							"to": schema.ListAttribute{
+								Description: "Required in an email block. The org members Glen emails, by their sign-in address, usually glen_member.<name>.email. Glen refuses the apply if one is not a member of the org, or if on names an event and to names no one.",
+								ElementType: types.StringType,
+								Optional:    true,
+							},
+							"on": schema.ListAttribute{
+								Description: "What Glen emails them on, each at most once: finished (a session settled done, with no ask open), failed (a session failed, not stopped by a budget) and needs_you (it asked, Glen held one of its calls, or a budget stopped it). Unset or empty, Glen emails them on none.",
+								ElementType: types.StringType,
+								Optional:    true,
+								Validators:  []validator.List{eachOnceOf(glen.NotifyOn)},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -144,6 +168,16 @@ func (r *agentResource) ValidateConfig(ctx context.Context, req resource.Validat
 		if known && set != 1 {
 			resp.Diagnostics.AddAttributeError(path.Root("trigger").AtListIndex(i), "Invalid trigger",
 				fmt.Sprintf("A trigger sets exactly one of schedule, feed and webhook; this one sets %d.", set))
+		}
+	}
+	// An absent single nested block holds its attributes null, so the
+	// schema cannot mark to required; the email block requires it here.
+	var email types.Object
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("notify").AtName("email"), &email)...)
+	if !email.IsNull() && !email.IsUnknown() {
+		if to, ok := email.Attributes()["to"]; ok && to.IsNull() {
+			resp.Diagnostics.AddAttributeError(path.Root("notify").AtName("email").AtName("to"), "Missing notify.email.to",
+				"An email block lists the org members Glen emails in to.")
 		}
 	}
 }
@@ -245,4 +279,43 @@ func (r *agentResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 
 func (r *agentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+}
+
+// eachOnceOf checks that a list of strings names only allowed values, each
+// at most once. Unknown items are left to Glen at apply.
+func eachOnceOf(allowed []string) validator.List {
+	return eachOnceOfValidator{allowed}
+}
+
+type eachOnceOfValidator struct{ allowed []string }
+
+func (v eachOnceOfValidator) Description(context.Context) string {
+	return "each item is one of " + strings.Join(v.allowed, ", ") + ", named at most once"
+}
+
+func (v eachOnceOfValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (v eachOnceOfValidator) ValidateList(_ context.Context, req validator.ListRequest, resp *validator.ListResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	var seen []string
+	for i, e := range req.ConfigValue.Elements() {
+		s, ok := e.(types.String)
+		if !ok || s.IsNull() || s.IsUnknown() {
+			continue
+		}
+		at := req.Path.AtListIndex(i)
+		switch item := s.ValueString(); {
+		case !slices.Contains(v.allowed, item):
+			resp.Diagnostics.AddAttributeError(at, "Invalid value",
+				fmt.Sprintf("%q is not one of %s.", item, strings.Join(v.allowed, ", ")))
+		case slices.Contains(seen, item):
+			resp.Diagnostics.AddAttributeError(at, "Duplicate value", fmt.Sprintf("%s is named twice.", item))
+		default:
+			seen = append(seen, item)
+		}
+	}
 }

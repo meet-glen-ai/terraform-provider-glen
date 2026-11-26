@@ -130,6 +130,11 @@ func (f *fakeGlen) putAgent(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, msg)
 		return
 	}
+	spec, msg := f.notifyMembers(spec)
+	if msg != "" {
+		fail(w, http.StatusBadRequest, msg)
+		return
+	}
 	if spec.Harness == "" {
 		spec.Harness = harnessFor(spec.Model)
 	}
@@ -333,7 +338,60 @@ func glenAgentRules(s glen.AgentSpec) string {
 			return fmt.Sprintf("webhook %q must be <source>:<event>", *t.Webhook)
 		}
 	}
+	if s.Notify != nil && s.Notify.Email != nil {
+		e := s.Notify.Email
+		for i, to := range e.To {
+			if !strings.Contains(to, "@") {
+				return fmt.Sprintf("notify.email.to %q must be an org member's email address", to)
+			}
+			if slices.ContainsFunc(e.To[:i], func(o string) bool { return strings.EqualFold(o, to) }) {
+				return fmt.Sprintf("notify.email.to names %s twice", to)
+			}
+		}
+		for i, on := range e.On {
+			if !slices.Contains(glen.NotifyOn, on) {
+				return fmt.Sprintf("notify.email.on %q must be one of finished, failed, needs_you", on)
+			}
+			if slices.Contains(e.On[:i], on) {
+				return fmt.Sprintf("notify.email.on names %s twice", on)
+			}
+		}
+	}
 	return ""
+}
+
+// notifyMembers is spec with notify.email.to as the org's members name
+// them, or Glen's refusal: of someone who is not a member, or, from an
+// API key, of an event on with no one to email.
+func (f *fakeGlen) notifyMembers(spec glen.AgentSpec) (glen.AgentSpec, string) {
+	if spec.Notify == nil || spec.Notify.Email == nil {
+		return spec, ""
+	}
+	e := *spec.Notify.Email
+	if len(e.To) == 0 {
+		if len(e.On) == 0 {
+			return spec, ""
+		}
+		return spec, "notify.email.to names no one: list the org members agent " + spec.Agent + " emails"
+	}
+	var missing []string
+	e.To = slices.Clone(e.To)
+	for i, to := range e.To {
+		found := false
+		for m, fm := range f.members {
+			if fm.state == "active" && strings.EqualFold(m, to) {
+				e.To[i], found = m, true
+			}
+		}
+		if !found {
+			missing = append(missing, to)
+		}
+	}
+	if len(missing) > 0 {
+		return spec, "notify.email.to names people who are not members of the org: " + strings.Join(missing, ", ") + "; Glen emails only its members"
+	}
+	spec.Notify = &glen.Notify{Email: &e}
+	return spec, ""
 }
 
 // harnessFor is the harness Glen gives a spec that leaves harness out.

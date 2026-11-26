@@ -16,6 +16,7 @@ type agentModel struct {
 	Budget                *budgetModel   `tfsdk:"budget"`
 	KnowledgeBase         types.String   `tfsdk:"knowledge_base"`
 	AllowedMessageSenders []string       `tfsdk:"allowed_message_senders"`
+	Notify                *notifyModel   `tfsdk:"notify"`
 	Version               types.Int64    `tfsdk:"version"`
 }
 
@@ -44,6 +45,15 @@ type budgetModel struct {
 	TokensPerSession types.Int64 `tfsdk:"tokens_per_session"`
 	SessionsPerDay   types.Int64 `tfsdk:"sessions_per_day"`
 	MaxTurns         types.Int64 `tfsdk:"max_turns"`
+}
+
+type notifyModel struct {
+	Email *emailNotifyModel `tfsdk:"email"`
+}
+
+type emailNotifyModel struct {
+	To []string `tfsdk:"to"`
+	On []string `tfsdk:"on"`
 }
 
 // spec is the agent JSON m says. A harness that is unset, or unknown
@@ -78,6 +88,9 @@ func (m agentModel) spec() glen.AgentSpec {
 			SessionsPerDay:   m.Budget.SessionsPerDay.ValueInt64Pointer(),
 			MaxTurns:         m.Budget.MaxTurns.ValueInt64Pointer(),
 		}
+	}
+	if m.Notify != nil && m.Notify.Email != nil {
+		s.Notify = &glen.Notify{Email: &glen.EmailNotify{To: m.Notify.Email.To, On: m.Notify.Email.On}}
 	}
 	return s.Normalized()
 }
@@ -125,6 +138,9 @@ func canonicalModel(a glen.Agent) agentModel {
 			MaxTurns:         types.Int64PointerValue(b.MaxTurns),
 		}
 	}
+	if n := s.Notify; n != nil && n.Email != nil {
+		m.Notify = &notifyModel{Email: &emailNotifyModel{To: orEmpty(n.Email.To), On: nonEmpty(n.Email.On)}}
+	}
 	return m
 }
 
@@ -135,6 +151,13 @@ func (m agentModel) refreshed(a glen.Agent) agentModel {
 		return m
 	}
 	return canonicalModel(a)
+}
+
+func orEmpty(xs []string) []string {
+	if xs == nil {
+		return []string{}
+	}
+	return xs
 }
 
 func nonEmpty(xs []string) []string {
