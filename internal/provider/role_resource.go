@@ -60,7 +60,7 @@ func (r *roleResource) Metadata(_ context.Context, req resource.MetadataRequest,
 
 func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "One of the org's own roles: a named group of members that grants nothing by itself. An agent's approvers name the roles whose members may allow its held tool calls, and are told of its asks. Every change is kept in Glen's history of roles. Glen refuses to destroy a role an agent names.",
+		Description: "One of the org's own roles: a named group of members that grants nothing by itself. An agent's allowed_message_senders name the roles whose members may message it, allowing its held tool calls among those messages, and are told of its asks. Every change is kept in Glen's history of roles. Glen refuses to destroy a role an agent names.",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Description:   "The role's name, kebab-case, at most 40 characters, and neither admin nor member, which are built in. Changing it replaces the role.",

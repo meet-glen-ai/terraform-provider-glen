@@ -13,9 +13,10 @@ type AgentSpec struct {
 	Sandbox       Sandbox   `json:"sandbox"`
 	Budget        Budget    `json:"budget"`
 	KnowledgeBase *string   `json:"knowledge_base"`
-	// Approvers are the roles whose members may allow the agent's held
-	// calls, besides its admins. Left out when none, as Glen writes it.
-	Approvers []string `json:"approvers,omitempty"`
+	// AllowedMessageSenders are the roles whose members may message the
+	// agent, allowing its held calls among those messages, besides its
+	// admins. Left out when none, as Glen writes it.
+	AllowedMessageSenders []string `json:"allowed_message_senders,omitempty"`
 }
 
 type Trigger struct {
@@ -67,8 +68,8 @@ func (s AgentSpec) Normalized() AgentSpec {
 	s.Trigger = orEmpty(s.Trigger)
 	s.Tools.MCP = normalizedUses(s.Tools.MCP)
 	s.Sandbox.Egress = orEmpty(s.Sandbox.Egress)
-	if len(s.Approvers) == 0 {
-		s.Approvers = nil
+	if len(s.AllowedMessageSenders) == 0 {
+		s.AllowedMessageSenders = nil
 	}
 	return s
 }

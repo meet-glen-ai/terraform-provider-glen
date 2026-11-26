@@ -13,9 +13,9 @@ import (
 	"github.com/meet-glen-ai/terraform-provider-glen/internal/glen"
 )
 
-// approverConfig is the role security held by members, and an agent
-// naming it as its approvers.
-func approverConfig(members ...string) string {
+// sendersConfig is the role security held by members, and an agent
+// naming it in its allowed_message_senders.
+func sendersConfig(members ...string) string {
 	quoted := make([]string, len(members))
 	for i, m := range members {
 		quoted[i] = fmt.Sprintf("%q", m)
@@ -31,7 +31,7 @@ resource "glen_agent" "triage" {
   name         = "triage"
   instructions = "Triage the alert.\n"
   model        = "claude-opus-5-5"
-  approvers    = [glen_role.security.name]
+  allowed_message_senders = [glen_role.security.name]
 }
 `, strings.Join(quoted, ", "))
 }
@@ -49,14 +49,14 @@ func (b backend) glenHasRole(name, description string, members ...string) resour
 	}
 }
 
-func (b backend) glenAgentApprovers(agent string, want ...string) resource.TestCheckFunc {
+func (b backend) glenAgentSenders(agent string, want ...string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		got, err := b.api.GetAgent(context.Background(), agent)
 		if err != nil {
 			return err
 		}
-		if !slices.Equal(got.Spec.Approvers, want) {
-			return fmt.Errorf("glen has %s's approvers as %v, want %v", agent, got.Spec.Approvers, want)
+		if !slices.Equal(got.Spec.AllowedMessageSenders, want) {
+			return fmt.Errorf("glen has %s's allowed_message_senders as %v, want %v", agent, got.Spec.AllowedMessageSenders, want)
 		}
 		return nil
 	}
@@ -81,18 +81,18 @@ func TestRoleHeldByMembersNamedByAnAgent(t *testing.T) {
 			CheckDestroy: b.roleGone("security"),
 			Steps: []resource.TestStep{
 				{
-					Config: b.config(approverConfig("ben@tf.example")),
+					Config: b.config(sendersConfig("ben@tf.example")),
 					Check: resource.ComposeTestCheckFunc(
 						b.glenHasRole("security", "Allows the triage agent's actions.", "ben@tf.example"),
-						b.glenAgentApprovers("triage", "security"),
+						b.glenAgentSenders("triage", "security"),
 					),
 				},
 				{
-					Config: b.config(approverConfig("cy@tf.example", "ben@tf.example")),
+					Config: b.config(sendersConfig("cy@tf.example", "ben@tf.example")),
 					Check:  b.glenHasRole("security", "Allows the triage agent's actions.", "ben@tf.example", "cy@tf.example"),
 				},
 				{
-					Config: b.config(approverConfig()),
+					Config: b.config(sendersConfig()),
 					Check:  b.glenHasRole("security", "Allows the triage agent's actions."),
 				},
 				{
@@ -103,7 +103,7 @@ func TestRoleHeldByMembersNamedByAnAgent(t *testing.T) {
 					ImportStateVerifyIdentifierAttribute: "name",
 				},
 				{
-					Config:      b.config(approverConfig("dee@tf.example")),
+					Config:      b.config(sendersConfig("dee@tf.example")),
 					ExpectError: regexp.MustCompile(`dee@tf.example\s+is\s+not\s+a\s+member\s+of\s+this\s+org`),
 				},
 			},
@@ -117,7 +117,7 @@ func TestRoleAnAgentNamesStays(t *testing.T) {
 		b.seedMember(t, "ana@tf.example", "admin")
 		b.test(t, resource.TestCase{
 			Steps: []resource.TestStep{
-				{Config: b.config(approverConfig())},
+				{Config: b.config(sendersConfig())},
 				{
 					// The agent outlives the apply, so the role it names does too.
 					Config: b.config(`
@@ -128,7 +128,7 @@ removed {
   }
 }
 `),
-					ExpectError: regexp.MustCompile(`role\s+security\s+approves\s+for\s+triage`),
+					ExpectError: regexp.MustCompile(`role\s+security\s+may\s+message\s+triage`),
 				},
 				{
 					Config: b.config(`
@@ -153,7 +153,7 @@ removed {
 	})
 }
 
-func TestAgentApproversMustBeRoles(t *testing.T) {
+func TestAgentAllowedMessageSendersMustBeRoles(t *testing.T) {
 	t.Parallel()
 	eachBackend(t, func(t *testing.T, b backend) {
 		b.test(t, resource.TestCase{Steps: []resource.TestStep{{
@@ -162,10 +162,10 @@ resource "glen_agent" "triage" {
   name         = "triage"
   instructions = "Triage the alert.\n"
   model        = "claude-opus-5-5"
-  approvers    = ["security"]
+  allowed_message_senders = ["security"]
 }
 `),
-			ExpectError: regexp.MustCompile(`approver\s+roles\s+the\s+org\s+does\s+not\s+have:\s+security`),
+			ExpectError: regexp.MustCompile(`names\s+roles\s+the\s+org\s+does\s+not\s+have:\s+security`),
 		}}})
 	})
 }

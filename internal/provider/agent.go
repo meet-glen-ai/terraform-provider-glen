@@ -6,17 +6,17 @@ import (
 )
 
 type agentModel struct {
-	Name          types.String   `tfsdk:"name"`
-	Instructions  types.String   `tfsdk:"instructions"`
-	Model         types.String   `tfsdk:"model"`
-	Harness       types.String   `tfsdk:"harness"`
-	Trigger       []triggerModel `tfsdk:"trigger"`
-	Tools         *toolsModel    `tfsdk:"tools"`
-	Sandbox       *sandboxModel  `tfsdk:"sandbox"`
-	Budget        *budgetModel   `tfsdk:"budget"`
-	KnowledgeBase types.String   `tfsdk:"knowledge_base"`
-	Approvers     []string       `tfsdk:"approvers"`
-	Version       types.Int64    `tfsdk:"version"`
+	Name                  types.String   `tfsdk:"name"`
+	Instructions          types.String   `tfsdk:"instructions"`
+	Model                 types.String   `tfsdk:"model"`
+	Harness               types.String   `tfsdk:"harness"`
+	Trigger               []triggerModel `tfsdk:"trigger"`
+	Tools                 *toolsModel    `tfsdk:"tools"`
+	Sandbox               *sandboxModel  `tfsdk:"sandbox"`
+	Budget                *budgetModel   `tfsdk:"budget"`
+	KnowledgeBase         types.String   `tfsdk:"knowledge_base"`
+	AllowedMessageSenders []string       `tfsdk:"allowed_message_senders"`
+	Version               types.Int64    `tfsdk:"version"`
 }
 
 type triggerModel struct {
@@ -50,12 +50,12 @@ type budgetModel struct {
 // until Glen answers, is left out, and Glen picks it.
 func (m agentModel) spec() glen.AgentSpec {
 	s := glen.AgentSpec{
-		Agent:         m.Name.ValueString(),
-		Instructions:  m.Instructions.ValueString(),
-		Harness:       m.Harness.ValueString(),
-		Model:         m.Model.ValueString(),
-		KnowledgeBase: m.KnowledgeBase.ValueStringPointer(),
-		Approvers:     m.Approvers,
+		Agent:                 m.Name.ValueString(),
+		Instructions:          m.Instructions.ValueString(),
+		Harness:               m.Harness.ValueString(),
+		Model:                 m.Model.ValueString(),
+		KnowledgeBase:         m.KnowledgeBase.ValueStringPointer(),
+		AllowedMessageSenders: m.AllowedMessageSenders,
 	}
 	for _, t := range m.Trigger {
 		s.Trigger = append(s.Trigger, glen.Trigger{
@@ -87,13 +87,13 @@ func (m agentModel) spec() glen.AgentSpec {
 func canonicalModel(a glen.Agent) agentModel {
 	s := a.Spec
 	m := agentModel{
-		Name:          types.StringValue(s.Agent),
-		Instructions:  types.StringValue(s.Instructions),
-		Model:         types.StringValue(s.Model),
-		Harness:       types.StringValue(s.Harness),
-		KnowledgeBase: types.StringPointerValue(s.KnowledgeBase),
-		Approvers:     nonEmpty(s.Approvers),
-		Version:       types.Int64Value(a.Version),
+		Name:                  types.StringValue(s.Agent),
+		Instructions:          types.StringValue(s.Instructions),
+		Model:                 types.StringValue(s.Model),
+		Harness:               types.StringValue(s.Harness),
+		KnowledgeBase:         types.StringPointerValue(s.KnowledgeBase),
+		AllowedMessageSenders: nonEmpty(s.AllowedMessageSenders),
+		Version:               types.Int64Value(a.Version),
 	}
 	for _, t := range s.Trigger {
 		m.Trigger = append(m.Trigger, triggerModel{

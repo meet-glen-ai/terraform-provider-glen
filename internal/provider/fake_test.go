@@ -126,7 +126,7 @@ func (f *fakeGlen) putAgent(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, fmt.Sprintf("invalid agent spec: agent %s names knowledge base %s, which does not exist", spec.Agent, *knowledge_base))
 		return
 	}
-	if msg := f.missingApprovers(spec); msg != "" {
+	if msg := f.missingRoles(spec); msg != "" {
 		fail(w, http.StatusBadRequest, msg)
 		return
 	}

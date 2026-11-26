@@ -61,8 +61,8 @@ func (r *agentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Description: "The glen_knowledge_base this agent reads, usually glen_knowledge_base.<name>.name. Glen refuses the apply if no such knowledge base exists.",
 				Optional:    true,
 			},
-			"approvers": schema.ListAttribute{
-				Description: "The roles whose members may allow this agent's held tool calls, usually glen_role.<name>.name; its admins always may. member lets anyone in the org. Unset, only admins allow, and they are the ones told of its asks; set, the roles' members are told. Glen refuses the apply if the org has no such role.",
+			"allowed_message_senders": schema.ListAttribute{
+				Description: "The roles whose members may message this agent, usually glen_role.<name>.name: start it, reply to it, answer its questions, allow or deny its held tool calls and stop it. Its admins always may, and member names everyone in the org. Unset, every member may message it, only admins allow its held calls, and admins are told of its asks; set, only the roles' members and admins may message it, and the roles' members are told. Glen refuses the apply if the org has no such role.",
 				ElementType: types.StringType,
 				Optional:    true,
 			},

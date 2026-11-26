@@ -370,14 +370,16 @@ and API tokens, or revokes the invitation. Glen refuses to demote or
 remove the org's last admin. A person who is already a member or invited
 is imported by email: `terraform import glen_member.ana ana@example.com`.
 
-## Define a role and an agent's approvers
+## Define a role and who may message an agent
 
 A role is a named group of the org's members, and grants nothing by
-itself. An agent's `approvers` names the roles whose members may allow
-its held tool calls; its admins always may. Glen mails those members
-when the agent waits on them, and sends each of them the daily digest of
-its asks. Unset, the agent's admins allow its calls and are the ones
-told.
+itself. An agent's `allowed_message_senders` names the roles whose
+members may message it: start it, reply to it, answer its questions,
+allow or deny its held tool calls and stop it. Its admins always may.
+Everyone else in the org may still read its sessions. Glen mails those
+members when the agent waits on them, and sends each of them the daily
+digest of its asks. Unset, every member may message the agent, only its
+admins allow its held calls, and the admins are the ones told.
 
 ```hcl
 resource "glen_role" "security" {
@@ -387,8 +389,8 @@ resource "glen_role" "security" {
 }
 
 resource "glen_agent" "alert_triage" {
-  name      = "alert-triage"
-  approvers = [glen_role.security.name]
+  name                    = "alert-triage"
+  allowed_message_senders = [glen_role.security.name]
   # instructions, model, triggers, tools, as above
 }
 ```
@@ -399,8 +401,8 @@ resource "glen_agent" "alert_triage" {
 | `description` | Optional, up to 300 characters. What the role is for. |
 | `members` | Optional set of emails, exactly who holds the role. Each must already be a member of the org: an invitation holds no role until it is accepted. Unset, Terraform leaves who holds the role to the console. |
 
-On `glen_agent`, `approvers` is an optional list of role names; `member`
-lets anyone in the org allow. Glen refuses an agent naming a role the org
+On `glen_agent`, `allowed_message_senders` is an optional list of role
+names; `member` names everyone in the org. Glen refuses an agent naming a role the org
 does not have, and refuses to delete a role while an agent names it, so
 `terraform destroy` deletes the agents first. Glen keeps every change to
 a role, who made it and when. A role is imported by name:

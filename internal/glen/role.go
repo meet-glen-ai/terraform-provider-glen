@@ -8,7 +8,7 @@ import (
 
 // Role is one of the org's roles, as GET /v1/roles/{name} answers: a
 // named group of members that grants nothing by itself. An agent's
-// approvers name the roles whose members may allow its held calls.
+// allowed_message_senders name the roles whose members may message it.
 // Members are by email, sorted. admin and member are built in, and
 // WorkOS decides who holds them.
 type Role struct {
@@ -40,7 +40,7 @@ func (c *Client) PutRole(ctx context.Context, name string, spec RoleSpec) (Role,
 }
 
 // DeleteRole deletes the role. Glen refuses (409) while an agent names
-// it as an approver.
+// it in its allowed_message_senders.
 func (c *Client) DeleteRole(ctx context.Context, name string) error {
 	return c.do(ctx, http.MethodDelete, "/v1/roles/"+url.PathEscape(name), nil, nil)
 }

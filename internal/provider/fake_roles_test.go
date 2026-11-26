@@ -28,11 +28,11 @@ func (f *fakeGlen) role(name string) glen.Role {
 	return glen.Role{Name: name, Description: r.description, Members: members}
 }
 
-// missingApprovers is Glen's refusal of an agent naming roles the org
+// missingRoles is Glen's refusal of an agent naming roles the org
 // does not have, or "" when it has them all.
-func (f *fakeGlen) missingApprovers(spec glen.AgentSpec) string {
+func (f *fakeGlen) missingRoles(spec glen.AgentSpec) string {
 	var missing []string
-	for _, a := range spec.Approvers {
+	for _, a := range spec.AllowedMessageSenders {
 		if a != "admin" && a != "member" && f.roles[a] == nil {
 			missing = append(missing, a)
 		}
@@ -40,7 +40,7 @@ func (f *fakeGlen) missingApprovers(spec glen.AgentSpec) string {
 	if len(missing) == 0 {
 		return ""
 	}
-	return "invalid agent spec: agent " + spec.Agent + " names approver roles the org does not have: " + strings.Join(missing, ", ") + "; an admin makes a role on Settings, Roles"
+	return "invalid agent spec: agent " + spec.Agent + " names roles the org does not have: " + strings.Join(missing, ", ") + "; an admin makes a role on Settings, Roles"
 }
 
 func (f *fakeGlen) getRole(w http.ResponseWriter, r *http.Request) {
@@ -95,13 +95,13 @@ func (f *fakeGlen) deleteRole(w http.ResponseWriter, r *http.Request) {
 	}
 	var naming []string
 	for _, a := range f.agents {
-		if !a.deleted && slices.Contains(a.spec.Approvers, name) {
+		if !a.deleted && slices.Contains(a.spec.AllowedMessageSenders, name) {
 			naming = append(naming, a.spec.Agent)
 		}
 	}
 	if len(naming) > 0 {
 		slices.Sort(naming)
-		fail(w, http.StatusConflict, "role "+name+" approves for "+strings.Join(naming, ", ")+"; take it out of their approvers first")
+		fail(w, http.StatusConflict, "role "+name+" may message "+strings.Join(naming, ", ")+"; take it out of their allowed_message_senders first")
 		return
 	}
 	delete(f.roles, name)
