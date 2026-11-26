@@ -24,6 +24,7 @@ type fakeGlen struct {
 	tools           map[string]*fakeTool
 	feeds           map[string]*fakeFeed
 	members         map[string]*fakeMember
+	roles           map[string]*fakeRole
 	// Each tool's credential value, and each provider's model key, as set.
 	credentials map[string]string
 	modelKeys   map[string]string
@@ -44,7 +45,7 @@ type fakeAgent struct {
 }
 
 func startFake(t *testing.T, adminKey string) string {
-	f := &fakeGlen{adminKey: adminKey, agents: map[string]*fakeAgent{}, knowledge_bases: map[string]*fakeKnowledgeBase{}, tools: map[string]*fakeTool{}, feeds: map[string]*fakeFeed{}, members: map[string]*fakeMember{}, credentials: map[string]string{}, modelKeys: map[string]string{}, autoRefill: defaultAutoRefill}
+	f := &fakeGlen{adminKey: adminKey, agents: map[string]*fakeAgent{}, knowledge_bases: map[string]*fakeKnowledgeBase{}, tools: map[string]*fakeTool{}, feeds: map[string]*fakeFeed{}, members: map[string]*fakeMember{}, roles: map[string]*fakeRole{}, credentials: map[string]string{}, modelKeys: map[string]string{}, autoRefill: defaultAutoRefill}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/validate/agent", f.validate)
 	mux.HandleFunc("GET /v1/agents/{name}", f.getAgent)
@@ -64,6 +65,7 @@ func startFake(t *testing.T, adminKey string) string {
 	mux.HandleFunc("PUT /v1/model-keys/{provider}", f.putModelKey)
 	mux.HandleFunc("DELETE /v1/model-keys/{provider}", f.deleteModelKey)
 	f.memberRoutes(mux)
+	f.roleRoutes(mux)
 	f.feedRoutes(mux)
 	f.billingRoutes(mux)
 	srv := httptest.NewServer(f.auth(mux))
@@ -122,6 +124,10 @@ func (f *fakeGlen) putAgent(w http.ResponseWriter, r *http.Request) {
 	}
 	if knowledge_base := spec.KnowledgeBase; knowledge_base != nil && !f.liveKnowledgeBase(*knowledge_base) {
 		fail(w, http.StatusBadRequest, fmt.Sprintf("invalid agent spec: agent %s names knowledge base %s, which does not exist", spec.Agent, *knowledge_base))
+		return
+	}
+	if msg := f.missingApprovers(spec); msg != "" {
+		fail(w, http.StatusBadRequest, msg)
 		return
 	}
 	if spec.Harness == "" {

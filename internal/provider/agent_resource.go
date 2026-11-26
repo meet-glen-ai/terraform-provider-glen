@@ -61,6 +61,11 @@ func (r *agentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Description: "The glen_knowledge_base this agent reads, usually glen_knowledge_base.<name>.name. Glen refuses the apply if no such knowledge base exists.",
 				Optional:    true,
 			},
+			"approvers": schema.ListAttribute{
+				Description: "The roles whose members may allow this agent's held tool calls, usually glen_role.<name>.name; its admins always may. member lets anyone in the org. Unset, only admins allow, and they are the ones told of its asks; set, the roles' members are told. Glen refuses the apply if the org has no such role.",
+				ElementType: types.StringType,
+				Optional:    true,
+			},
 			"version": schema.Int64Attribute{
 				Description: "The agent's version in Glen after the last apply or refresh.",
 				Computed:    true,

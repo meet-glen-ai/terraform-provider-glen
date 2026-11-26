@@ -15,6 +15,7 @@ type agentModel struct {
 	Sandbox       *sandboxModel  `tfsdk:"sandbox"`
 	Budget        *budgetModel   `tfsdk:"budget"`
 	KnowledgeBase types.String   `tfsdk:"knowledge_base"`
+	Approvers     []string       `tfsdk:"approvers"`
 	Version       types.Int64    `tfsdk:"version"`
 }
 
@@ -54,6 +55,7 @@ func (m agentModel) spec() glen.AgentSpec {
 		Harness:       m.Harness.ValueString(),
 		Model:         m.Model.ValueString(),
 		KnowledgeBase: m.KnowledgeBase.ValueStringPointer(),
+		Approvers:     m.Approvers,
 	}
 	for _, t := range m.Trigger {
 		s.Trigger = append(s.Trigger, glen.Trigger{
@@ -90,6 +92,7 @@ func canonicalModel(a glen.Agent) agentModel {
 		Model:         types.StringValue(s.Model),
 		Harness:       types.StringValue(s.Harness),
 		KnowledgeBase: types.StringPointerValue(s.KnowledgeBase),
+		Approvers:     nonEmpty(s.Approvers),
 		Version:       types.Int64Value(a.Version),
 	}
 	for _, t := range s.Trigger {

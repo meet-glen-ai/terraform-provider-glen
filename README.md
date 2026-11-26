@@ -5,7 +5,8 @@ and turns every run into knowledge. This provider keeps your Glen org as
 code: each agent is a `glen_agent`, each knowledge base a
 `glen_knowledge_base`, each feed its agents start on a `glen_feed`, each
 of the org's tools a `glen_tool`, each of its
-people a `glen_member`, the org's model keys `glen_model_key`, and its
+people a `glen_member`, each of its own roles a `glen_role`, the org's
+model keys `glen_model_key`, and its
 auto refill `glen_auto_refill`.
 `terraform plan` shows what would change, and `terraform apply` changes
 it through Glen's admin API.
@@ -368,6 +369,42 @@ Destroying a member ends the membership, with the person's console logins
 and API tokens, or revokes the invitation. Glen refuses to demote or
 remove the org's last admin. A person who is already a member or invited
 is imported by email: `terraform import glen_member.ana ana@example.com`.
+
+## Define a role and an agent's approvers
+
+A role is a named group of the org's members, and grants nothing by
+itself. An agent's `approvers` names the roles whose members may allow
+its held tool calls; its admins always may. Glen mails those members
+when the agent waits on them, and sends each of them the daily digest of
+its asks. Unset, the agent's admins allow its calls and are the ones
+told.
+
+```hcl
+resource "glen_role" "security" {
+  name        = "security"
+  description = "Allows containment."
+  members     = [glen_member.ana.email]
+}
+
+resource "glen_agent" "alert_triage" {
+  name      = "alert-triage"
+  approvers = [glen_role.security.name]
+  # instructions, model, triggers, tools, as above
+}
+```
+
+| Attribute | Notes |
+|---|---|
+| `name` | Required. Kebab-case, at most 40 characters, neither `admin` nor `member`, which are built in. Changing it replaces the role. |
+| `description` | Optional, up to 300 characters. What the role is for. |
+| `members` | Optional set of emails, exactly who holds the role. Each must already be a member of the org: an invitation holds no role until it is accepted. Unset, Terraform leaves who holds the role to the console. |
+
+On `glen_agent`, `approvers` is an optional list of role names; `member`
+lets anyone in the org allow. Glen refuses an agent naming a role the org
+does not have, and refuses to delete a role while an agent names it, so
+`terraform destroy` deletes the agents first. Glen keeps every change to
+a role, who made it and when. A role is imported by name:
+`terraform import glen_role.security security`.
 
 ## Set a model key
 
