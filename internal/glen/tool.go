@@ -8,19 +8,36 @@ import (
 	"strings"
 )
 
-// McpUse is one tools.mcp entry: a tool by name, and whose connection its
-// calls use. Glen writes a service use as the bare name.
+// McpUse is one tools.mcp entry: a tool by name, whose connection its
+// calls use, and the functions it holds back for this agent. Glen writes
+// a service use with no policies as the bare name.
 type McpUse struct {
 	Server string
 	// As is user, agent or service. Empty is service.
 	As string
+	// Policies are the tool's functions this agent's calls to which wait
+	// for a person's approval (approve) or never run (never), by name. Each
+	// is the stricter of it and the org's policy for the function.
+	Policies map[string]string
 }
 
+// ToolPolicies is every policy an agent's tools.mcp entry may set: an
+// agent makes a function stricter than the org's policy, never looser.
+var ToolPolicies = []string{"approve", "never"}
+
 func (m McpUse) MarshalJSON() ([]byte, error) {
-	if m.As == "" || m.As == "service" {
+	service := m.As == "" || m.As == "service"
+	if service && len(m.Policies) == 0 {
 		return json.Marshal(m.Server)
 	}
-	return json.Marshal(map[string]string{"server": m.Server, "as": m.As})
+	t := map[string]any{"server": m.Server}
+	if !service {
+		t["as"] = m.As
+	}
+	if len(m.Policies) > 0 {
+		t["policies"] = m.Policies
+	}
+	return json.Marshal(t)
 }
 
 func (m *McpUse) UnmarshalJSON(b []byte) error {
@@ -30,15 +47,19 @@ func (m *McpUse) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var t struct {
-		Server string `json:"server"`
-		As     string `json:"as"`
+		Server   string            `json:"server"`
+		As       string            `json:"as"`
+		Policies map[string]string `json:"policies"`
 	}
 	if err := strict(b, &t); err != nil {
 		return err
 	}
-	m.Server, m.As = t.Server, t.As
+	m.Server, m.As, m.Policies = t.Server, t.As, t.Policies
 	if m.As == "service" {
 		m.As = ""
+	}
+	if len(m.Policies) == 0 {
+		m.Policies = nil
 	}
 	return nil
 }
@@ -48,6 +69,9 @@ func normalizedUses(uses []McpUse) []McpUse {
 	for i, m := range uses {
 		if m.As == "service" {
 			m.As = ""
+		}
+		if len(m.Policies) == 0 {
+			m.Policies = nil
 		}
 		out[i] = m
 	}

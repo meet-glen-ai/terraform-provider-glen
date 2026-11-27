@@ -16,6 +16,7 @@
     "sandbox.web_search",
     "tools.mcp[]",
     "tools.mcp[].as",
+    "tools.mcp[].policies.*",
     "tools.mcp[].server",
     "trigger[].feed",
     "trigger[].schedule",

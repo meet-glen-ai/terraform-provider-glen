@@ -98,6 +98,14 @@ func (r *agentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 									Description: "Whose connection the tool's calls use: user, agent or service. Unset is service. A tool people sign in to takes user or agent.",
 									Optional:    true,
 								},
+								"policies": schema.MapAttribute{
+									Description: "The tool's functions this agent holds back, by function name: approve (a call waits for a person's approval in its session) or never (Glen refuses it). " +
+										"Each function gets the stricter of this and the org's policy, which admins set on the tool's page in the console, so an agent makes a function stricter, never looser. " +
+										"Glen refuses it while a CLI tool of the same service the agent has sends every request with its credential.",
+									ElementType: types.StringType,
+									Optional:    true,
+									Validators:  []validator.Map{valuesOneOf(glen.ToolPolicies)},
+								},
 							},
 						},
 					},
@@ -279,6 +287,38 @@ func (r *agentResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 
 func (r *agentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+}
+
+// valuesOneOf checks that each value of a map of strings is one of
+// allowed. Unknown values are left to Glen at apply.
+func valuesOneOf(allowed []string) validator.Map {
+	return valuesOneOfValidator{allowed}
+}
+
+type valuesOneOfValidator struct{ allowed []string }
+
+func (v valuesOneOfValidator) Description(context.Context) string {
+	return "each value is one of " + strings.Join(v.allowed, ", ")
+}
+
+func (v valuesOneOfValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (v valuesOneOfValidator) ValidateMap(_ context.Context, req validator.MapRequest, resp *validator.MapResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	for k, e := range req.ConfigValue.Elements() {
+		s, ok := e.(types.String)
+		if !ok || s.IsNull() || s.IsUnknown() {
+			continue
+		}
+		if !slices.Contains(v.allowed, s.ValueString()) {
+			resp.Diagnostics.AddAttributeError(req.Path.AtMapKey(k), "Invalid value",
+				fmt.Sprintf("%s is %q, which is not one of %s: an agent makes a function stricter than the org's policy, never looser.", k, s.ValueString(), strings.Join(v.allowed, ", ")))
+		}
+	}
 }
 
 // eachOnceOf checks that a list of strings names only allowed values, each

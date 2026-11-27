@@ -22,7 +22,8 @@ import (
 // with the `[]` taken out, or the path renamed names an attribute.
 var specFieldRenames = map[string]map[string]string{
 	"agent": {
-		"agent": "name",
+		"agent":                  "name",
+		"tools.mcp[].policies.*": "tools.mcp.policies",
 	},
 	"tool": {
 		"cli.hosts[].auth.basic":       "cli.hosts.user",

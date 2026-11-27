@@ -619,3 +619,52 @@ resource "glen_tool" "read" {
 		}},
 	})
 }
+
+func TestAgentToolPoliciesRoundTrip(t *testing.T) {
+	t.Parallel()
+	eachBackend(t, func(t *testing.T, b backend) {
+		agent := func(policies string) string {
+			return b.config(ticketsConfig("https://tickets.example/mcp") + fmt.Sprintf(`
+resource "glen_agent" "triage" {
+  name         = "alert-triage"
+  instructions = "# Alert triage\n"
+  model        = "claude-opus-5-5"
+
+  tools {
+    mcp = [{ server = glen_tool.tickets.name, policies = %s }]
+  }
+}
+`, policies))
+		}
+		held := agent(`{ close_ticket = "approve", delete_ticket = "never" }`)
+		b.test(t, resource.TestCase{
+			CheckDestroy: resource.ComposeTestCheckFunc(b.agentGone("alert-triage"), b.toolsGone("tickets")),
+			Steps: []resource.TestStep{
+				{
+					Config:      agent(`{ close_ticket = "auto" }`),
+					PlanOnly:    true,
+					ExpectError: regexp.MustCompile(`close_ticket is "auto", which is not one of approve, never`),
+				},
+				{
+					Config: held,
+					Check:  b.glenHas(triageWithTools(glen.McpUse{Server: "tickets", Policies: map[string]string{"close_ticket": "approve", "delete_ticket": "never"}}), 1),
+				},
+				{
+					Config:           held,
+					ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}},
+				},
+				{
+					ResourceName:                         triageAddr,
+					ImportState:                          true,
+					ImportStateId:                        "alert-triage",
+					ImportStateVerify:                    true,
+					ImportStateVerifyIdentifierAttribute: "name",
+				},
+				{
+					Config: agent(`{}`),
+					Check:  b.glenHas(triageWithTools(glen.McpUse{Server: "tickets"}), 2),
+				},
+			},
+		})
+	})
+}

@@ -35,9 +35,13 @@ func TestToolsAreWrittenAsGlenReadsThem(t *testing.T) {
 		t.Error("an auth Glen does not have read as bearer")
 	}
 
-	uses := []McpUse{{Server: "tickets"}, {Server: "notion", As: "user"}, {Server: "jira", As: "service"}}
+	uses := []McpUse{
+		{Server: "tickets"}, {Server: "notion", As: "user"}, {Server: "jira", As: "service", Policies: map[string]string{}},
+		{Server: "github", As: "agent", Policies: map[string]string{"merge_pull_request": "approve"}},
+		{Server: "pager", Policies: map[string]string{"resolve": "never"}},
+	}
 	got, _ = json.Marshal(uses)
-	if want := `["tickets",{"as":"user","server":"notion"},"jira"]`; string(got) != want {
+	if want := `["tickets",{"as":"user","server":"notion"},"jira",{"as":"agent","policies":{"merge_pull_request":"approve"},"server":"github"},{"policies":{"resolve":"never"},"server":"pager"}]`; string(got) != want {
 		t.Errorf("wrote %s, want %s", got, want)
 	}
 	var read []McpUse

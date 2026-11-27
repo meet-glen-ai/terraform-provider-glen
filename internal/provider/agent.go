@@ -31,8 +31,9 @@ type toolsModel struct {
 }
 
 type mcpUseModel struct {
-	Server types.String `tfsdk:"server"`
-	As     types.String `tfsdk:"as"`
+	Server   types.String      `tfsdk:"server"`
+	As       types.String      `tfsdk:"as"`
+	Policies map[string]string `tfsdk:"policies"`
 }
 
 type sandboxModel struct {
@@ -76,7 +77,7 @@ func (m agentModel) spec() glen.AgentSpec {
 	}
 	if m.Tools != nil {
 		for _, u := range m.Tools.MCP {
-			s.Tools.MCP = append(s.Tools.MCP, glen.McpUse{Server: u.Server.ValueString(), As: u.As.ValueString()})
+			s.Tools.MCP = append(s.Tools.MCP, glen.McpUse{Server: u.Server.ValueString(), As: u.As.ValueString(), Policies: u.Policies})
 		}
 	}
 	if m.Sandbox != nil {
@@ -122,7 +123,7 @@ func canonicalModel(a glen.Agent) agentModel {
 			if u.As != "" {
 				as = types.StringValue(u.As)
 			}
-			m.Tools.MCP = append(m.Tools.MCP, mcpUseModel{Server: types.StringValue(u.Server), As: as})
+			m.Tools.MCP = append(m.Tools.MCP, mcpUseModel{Server: types.StringValue(u.Server), As: as, Policies: u.Policies})
 		}
 	}
 	if sb := s.Sandbox; sb.Image != nil || len(sb.Egress) > 0 || sb.WebSearch {
