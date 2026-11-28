@@ -50,6 +50,11 @@ type budgetModel struct {
 
 type notifyModel struct {
 	Email *emailNotifyModel `tfsdk:"email"`
+	Slack *slackNotifyModel `tfsdk:"slack"`
+}
+
+type slackNotifyModel struct {
+	Channel types.String `tfsdk:"channel"`
 }
 
 type emailNotifyModel struct {
@@ -90,8 +95,15 @@ func (m agentModel) spec() glen.AgentSpec {
 			MaxTurns:         m.Budget.MaxTurns.ValueInt64Pointer(),
 		}
 	}
-	if m.Notify != nil && m.Notify.Email != nil {
-		s.Notify = &glen.Notify{Email: &glen.EmailNotify{To: m.Notify.Email.To, On: m.Notify.Email.On}}
+	if m.Notify != nil {
+		n := glen.Notify{}
+		if m.Notify.Email != nil {
+			n.Email = &glen.EmailNotify{To: m.Notify.Email.To, On: m.Notify.Email.On}
+		}
+		if m.Notify.Slack != nil && !m.Notify.Slack.Channel.IsNull() {
+			n.Slack = &glen.SlackNotify{Channel: m.Notify.Slack.Channel.ValueString()}
+		}
+		s.Notify = &n
 	}
 	return s.Normalized()
 }
@@ -139,8 +151,14 @@ func canonicalModel(a glen.Agent) agentModel {
 			MaxTurns:         types.Int64PointerValue(b.MaxTurns),
 		}
 	}
-	if n := s.Notify; n != nil && n.Email != nil {
-		m.Notify = &notifyModel{Email: &emailNotifyModel{To: orEmpty(n.Email.To), On: nonEmpty(n.Email.On)}}
+	if n := s.Notify; n != nil && (n.Email != nil || n.Slack != nil) {
+		m.Notify = &notifyModel{}
+		if n.Email != nil {
+			m.Notify.Email = &emailNotifyModel{To: orEmpty(n.Email.To), On: nonEmpty(n.Email.On)}
+		}
+		if n.Slack != nil {
+			m.Notify.Slack = &slackNotifyModel{Channel: types.StringValue(n.Slack.Channel)}
+		}
 	}
 	return m
 }

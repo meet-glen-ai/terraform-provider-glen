@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -357,8 +358,14 @@ func glenAgentRules(s glen.AgentSpec) string {
 			}
 		}
 	}
+	if s.Notify != nil && s.Notify.Slack != nil && !slackChannel.MatchString(s.Notify.Slack.Channel) {
+		return fmt.Sprintf("notify.slack.channel %q must be a Slack channel's id, such as C0123ABCD: C or G, then 8 or more capital letters or digits", s.Notify.Slack.Channel)
+	}
 	return ""
 }
+
+// slackChannel is a Slack channel's id, as Glen checks it.
+var slackChannel = regexp.MustCompile(`^[CG][A-Z0-9]{8,}$`)
 
 // notifyMembers is spec with notify.email.to as the org's members name
 // them, or Glen's refusal: of someone who is not a member, or, from an
@@ -390,7 +397,7 @@ func (f *fakeGlen) notifyMembers(spec glen.AgentSpec) (glen.AgentSpec, string) {
 	if len(missing) > 0 {
 		return spec, "notify.email.to names people who are not members of the org: " + strings.Join(missing, ", ") + "; Glen emails only its members"
 	}
-	spec.Notify = &glen.Notify{Email: &e}
+	spec.Notify = &glen.Notify{Email: &e, Slack: spec.Notify.Slack}
 	return spec, ""
 }
 

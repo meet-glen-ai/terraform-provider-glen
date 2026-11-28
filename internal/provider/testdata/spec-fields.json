@@ -11,6 +11,7 @@
     "model",
     "notify.email.on[]",
     "notify.email.to[]",
+    "notify.slack.channel",
     "sandbox.egress[]",
     "sandbox.image",
     "sandbox.web_search",

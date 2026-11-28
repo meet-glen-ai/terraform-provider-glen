@@ -21,12 +21,20 @@ type AgentSpec struct {
 	// admins. Left out when none, as Glen writes it.
 	AllowedMessageSenders []string `json:"allowed_message_senders,omitempty"`
 	// Notify is who Glen emails when the agent's session finishes, fails
-	// or needs someone. Left out when unset, as Glen writes it.
+	// or needs someone, and the Slack channel its asks and held calls are
+	// posted to. Left out when unset, as Glen writes it.
 	Notify *Notify `json:"notify,omitempty"`
 }
 
 type Notify struct {
 	Email *EmailNotify `json:"email,omitempty"`
+	Slack *SlackNotify `json:"slack,omitempty"`
+}
+
+// SlackNotify posts each of the agent's asks and held calls to Channel,
+// a Slack channel's id, in the workspace the org added Glen's Slack app to.
+type SlackNotify struct {
+	Channel string `json:"channel"`
 }
 
 // EmailNotify emails the org's members To, by their sign-in address, on
@@ -91,14 +99,19 @@ func (s AgentSpec) Normalized() AgentSpec {
 	if len(s.AllowedMessageSenders) == 0 {
 		s.AllowedMessageSenders = nil
 	}
-	// A notify with no email says nothing, and Glen leaves it out.
-	if s.Notify != nil && s.Notify.Email == nil {
+	// A notify with no email and no Slack says nothing, and Glen leaves
+	// it out.
+	if s.Notify != nil && s.Notify.Email == nil && s.Notify.Slack == nil {
 		s.Notify = nil
 	}
 	if s.Notify != nil {
-		e := *s.Notify.Email
-		e.To, e.On = orEmpty(e.To), orEmpty(e.On)
-		s.Notify = &Notify{Email: &e}
+		n := Notify{Slack: s.Notify.Slack}
+		if s.Notify.Email != nil {
+			e := *s.Notify.Email
+			e.To, e.On = orEmpty(e.To), orEmpty(e.On)
+			n.Email = &e
+		}
+		s.Notify = &n
 	}
 	return s
 }
@@ -111,7 +124,7 @@ func (s AgentSpec) Equal(o AgentSpec) bool {
 }
 
 func (s AgentSpec) foldedAddresses() AgentSpec {
-	if s.Notify == nil {
+	if s.Notify == nil || s.Notify.Email == nil {
 		return s
 	}
 	e := *s.Notify.Email
@@ -119,7 +132,7 @@ func (s AgentSpec) foldedAddresses() AgentSpec {
 	for i, to := range s.Notify.Email.To {
 		e.To[i] = strings.ToLower(to)
 	}
-	s.Notify = &Notify{Email: &e}
+	s.Notify = &Notify{Email: &e, Slack: s.Notify.Slack}
 	return s
 }
 

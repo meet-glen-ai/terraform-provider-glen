@@ -174,3 +174,67 @@ func TestAgentNotifyGlenRefusesAtApply(t *testing.T) {
 		})
 	})
 }
+
+func TestAgentNotifySlack(t *testing.T) {
+	t.Parallel()
+	slack := `
+  notify {
+    slack {
+      channel = "C0123ABCD"
+    }
+  }
+`
+	both := `
+  notify {
+    email {
+      to = ["ann@tf.example"]
+      on = ["needs_you"]
+    }
+    slack {
+      channel = "G0123ABCD"
+    }
+  }
+`
+	eachBackend(t, func(t *testing.T, b backend) {
+		b.seedMember(t, "ann@tf.example", "member")
+		b.test(t, resource.TestCase{
+			CheckDestroy: b.agentGone("pager"),
+			Steps: []resource.TestStep{
+				{
+					Config: b.config(notifyConfig(slack)),
+					Check:  b.glenHas(pagerSpec(&glen.Notify{Slack: &glen.SlackNotify{Channel: "C0123ABCD"}}), 1),
+				},
+				{
+					ResourceName:                         pagerAddr,
+					ImportState:                          true,
+					ImportStateId:                        "pager",
+					ImportStateVerify:                    true,
+					ImportStateVerifyIdentifierAttribute: "name",
+				},
+				{
+					Config: b.config(notifyConfig(both)),
+					Check: b.glenHas(pagerSpec(&glen.Notify{
+						Email: &glen.EmailNotify{To: []string{"ann@tf.example"}, On: []string{"needs_you"}},
+						Slack: &glen.SlackNotify{Channel: "G0123ABCD"},
+					}), 2),
+				},
+				{
+					Config:   b.config(notifyConfig(both)),
+					PlanOnly: true,
+				},
+				{
+					Config:      b.config(notifyConfig("  notify {\n    slack {\n      channel = \"#security\"\n    }\n  }\n")),
+					ExpectError: regexp.MustCompile(`notify.slack.channel\s+"#security"\s+must\s+be\s+a\s+Slack\s+channel's\s+id`),
+				},
+				{
+					Config:      b.config(notifyConfig("  notify {\n    slack {}\n  }\n")),
+					ExpectError: regexp.MustCompile(`Missing\s+notify.slack.channel`),
+				},
+				{
+					Config: b.config(notifyConfig("")),
+					Check:  b.glenHas(pagerSpec(nil), 3),
+				},
+			},
+		})
+	})
+}

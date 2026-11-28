@@ -130,7 +130,7 @@ func (r *agentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 			},
 			"notify": schema.SingleNestedBlock{
-				Description: "Who Glen tells when one of the agent's sessions finishes, fails or needs someone. Unset, Glen emails no one of them.",
+				Description: "Who Glen tells when one of the agent's sessions finishes, fails or needs someone, and the Slack channel its asks and held calls are posted to. Unset, Glen emails no one of them and posts nothing.",
 				Blocks: map[string]schema.Block{
 					"email": schema.SingleNestedBlock{
 						Description: "Email to the org's members.",
@@ -145,6 +145,15 @@ func (r *agentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 								ElementType: types.StringType,
 								Optional:    true,
 								Validators:  []validator.List{eachOnceOf(glen.NotifyOn)},
+							},
+						},
+					},
+					"slack": schema.SingleNestedBlock{
+						Description: "A Slack channel each of the agent's asks and held calls is posted to, in the workspace the org added Glen's Slack app to. A reply in the post's thread is the session's next message, and an approver allows or denies a held call with its buttons.",
+						Attributes: map[string]schema.Attribute{
+							"channel": schema.StringAttribute{
+								Description: "Required in a slack block. The channel's id, such as C0123ABCD (a private channel's starts with G), from the channel's details in Slack. Glen's app must be in the channel.",
+								Optional:    true,
 							},
 						},
 					},
@@ -186,6 +195,14 @@ func (r *agentResource) ValidateConfig(ctx context.Context, req resource.Validat
 		if to, ok := email.Attributes()["to"]; ok && to.IsNull() {
 			resp.Diagnostics.AddAttributeError(path.Root("notify").AtName("email").AtName("to"), "Missing notify.email.to",
 				"An email block lists the org members Glen emails in to.")
+		}
+	}
+	var slack types.Object
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("notify").AtName("slack"), &slack)...)
+	if !slack.IsNull() && !slack.IsUnknown() {
+		if channel, ok := slack.Attributes()["channel"]; ok && channel.IsNull() {
+			resp.Diagnostics.AddAttributeError(path.Root("notify").AtName("slack").AtName("channel"), "Missing notify.slack.channel",
+				"A slack block names the channel's id in channel.")
 		}
 	}
 }
